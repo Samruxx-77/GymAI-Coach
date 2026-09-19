@@ -33,5 +33,6 @@ pnpm-debug.log*
 # misc
 .vercel
 .vite/
+isolate/
 coverage/
 *.tsbuildinfo
