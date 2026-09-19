@@ -8,7 +8,7 @@
     "dev": "bun run dev:web",
     "dev:web": "vite",
     "dev:api": "node server/dev-server.mjs",
-    "build": "vite build",
+    "build": "npx vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit"
   },
