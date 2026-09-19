@@ -134,11 +134,17 @@ Handles timeouts, rate limits (429), provider failures, empty responses, invalid
 
 ## Vercel deployment
 
+Vercel is the primary production host: the static app **and** the `/api/ai/*` serverless functions deploy together from one repo import — no separate API hosting needed.
+
+The repo ships `vercel.json` (framework: vite, build `npx vite build`, output `dist/`, SPA rewrites, `api/**` function settings) — zero-config import.
+
 1. Push this repo to GitHub
-2. In Vercel: **Add New → Project → Import** the repo (framework: **Vite**, auto-detected; build `vite build`, output `dist/`)
-3. Add environment variables (see table above) — at minimum the two `VITE_SUPABASE_*` values and `OPENROUTER_API_KEY`
-4. Deploy. `api/*.mjs` functions are picked up automatically — no extra config needed
-5. In Supabase → Authentication → URL Configuration, add your Vercel URL as a **Site URL** (and redirect URL) so password-reset links work in production
+2. In Vercel: **Add New → Project → Import** the repo (framework **Vite** auto-detected; `vercel.json` supplies the rest)
+3. Add environment variables (see table above) — at minimum the two `VITE_SUPABASE_*` values and `OPENROUTER_API_KEY`. `VITE_*` values are baked in at build time, so add them **before** the first deploy
+4. Deploy — every push to `main` redeploys; every PR gets a preview URL
+5. In Supabase → Authentication → URL Configuration, add your Vercel URL as **Site URL** (plus redirect URLs) so password-reset links work in production
+
+CLI alternative: `npm i -g vercel && npm run deploy` (first run links the project interactively; `deploy:prod` ships straight to production).
 
 ## Development commands
 

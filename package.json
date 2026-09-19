@@ -10,6 +10,8 @@
     "dev:api": "node server/dev-server.mjs",
     "build": "npx vite build",
     "preview": "vite preview",
+    "deploy": "vercel",
+    "deploy:prod": "vercel --prod",
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
