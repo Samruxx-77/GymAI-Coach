@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ProfileProvider } from "./context/ProfileContext";
 import { DataProvider } from "./context/DataContext";
@@ -59,8 +59,7 @@ function OnboardingPage() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
+    <AuthProvider>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<Auth />} />
@@ -85,6 +84,5 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </AuthProvider>
-    </BrowserRouter>
   );
 }
