@@ -1,12 +1,29 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { ContactShadows, Environment, Float, Lightformer, Sparkles } from "@react-three/drei";
 
-const ACCENT = "#7c5cff";
-const ACCENT_LIGHT = "#a78bfa";
 const STEEL = "#d7dde8";
 const IRON = "#28304a";
+
+/** Reads the live theme accent tokens off <html> (set by ThemeContext). */
+function useSceneColors() {
+  const read = () => {
+    if (typeof document === "undefined") return null;
+    const s = getComputedStyle(document.documentElement);
+    const accent = s.getPropertyValue("--color-accent").trim();
+    const light = s.getPropertyValue("--color-accent-300").trim();
+    const glow = s.getPropertyValue("--color-data-blue").trim();
+    return accent && light ? { accent, light, glow: glow || accent } : null;
+  };
+  const [colors, setColors] = useState(read);
+  useEffect(() => {
+    const h = () => setColors(read());
+    window.addEventListener("themechange", h);
+    return () => window.removeEventListener("themechange", h);
+  }, []);
+  return colors ?? { accent: "#7c5cff", light: "#a78bfa", glow: "#5b8cff" };
+}
 
 /* [radius, width, x-position] per side — reads like a loaded dumbbell */
 const PLATES: Array<[number, number, number]> = [
@@ -15,7 +32,7 @@ const PLATES: Array<[number, number, number]> = [
   [0.62, 0.2, 2.9],
 ];
 
-function Plate({ radius, width, x }: { radius: number; width: number; x: number }) {
+function Plate({ radius, width, x, accent }: { radius: number; width: number; x: number; accent: string }) {
   return (
     <group position={[x, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
       <mesh castShadow>
@@ -25,17 +42,17 @@ function Plate({ radius, width, x }: { radius: number; width: number; x: number 
       {/* accent ring face */}
       <mesh position={[width / 2 + 0.001, 0, 0]} rotation={[0, 0, 0]}>
         <torusGeometry args={[radius * 0.72, radius * 0.075, 12, 48]} />
-        <meshStandardMaterial color={ACCENT} emissive={ACCENT} emissiveIntensity={0.55} metalness={0.4} roughness={0.4} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.55} metalness={0.4} roughness={0.4} />
       </mesh>
       <mesh position={[-width / 2 - 0.001, 0, 0]}>
         <torusGeometry args={[radius * 0.72, radius * 0.075, 12, 48]} />
-        <meshStandardMaterial color={ACCENT} emissive={ACCENT} emissiveIntensity={0.55} metalness={0.4} roughness={0.4} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.55} metalness={0.4} roughness={0.4} />
       </mesh>
     </group>
   );
 }
 
-function Dumbbell() {
+function Dumbbell({ accent }: { accent: string }) {
   const group = useRef<THREE.Group>(null);
   const target = useRef({ x: 0, y: 0 });
 
@@ -82,20 +99,22 @@ function Dumbbell() {
         </mesh>
       ))}
       {PLATES.map((p, i) => (
-        <Plate key={i} radius={p[0]} width={p[1]} x={p[2]} />
+        <Plate key={i} radius={p[0]} width={p[1]} x={p[2]} accent={accent} />
       ))}
       {PLATES.map((p, i) => (
-        <Plate key={`m${i}`} radius={p[0]} width={p[1]} x={-p[2]} />
+        <Plate key={`m${i}`} radius={p[0]} width={p[1]} x={-p[2]} accent={accent} />
       ))}
     </group>
   );
 }
 
-/** Studio-lit metallic dumbbell with violet rim light + contact shadow. */
+/** Studio-lit metallic dumbbell rim-lit in the active theme's accent. */
 export default function DumbbellScene({ quality = "high" }: { quality?: "high" | "low" }) {
+  const c = useSceneColors();
   const envRes = quality === "high" ? 256 : 128;
   return (
     <Canvas
+      key={`${c.accent}-${quality}`} /* remount only when the theme changes */
       dpr={[1, quality === "high" ? 2 : 1.25]}
       camera={{ position: [0, 0.6, 7.2], fov: 38 }}
       gl={{ antialias: quality === "high", alpha: true, powerPreference: "high-performance" }}
@@ -104,13 +123,13 @@ export default function DumbbellScene({ quality = "high" }: { quality?: "high" |
       <ambientLight intensity={0.35} />
       <directionalLight position={[4, 6, 5]} intensity={1.1} />
       <Float speed={1.6} rotationIntensity={0.25} floatIntensity={0.7}>
-        <Dumbbell />
+        <Dumbbell accent={c.accent} />
       </Float>
-      <Sparkles count={quality === "high" ? 60 : 24} scale={[9, 5.5, 4]} size={2.2} speed={0.32} opacity={0.5} color={ACCENT_LIGHT} />
+      <Sparkles count={quality === "high" ? 60 : 24} scale={[9, 5.5, 4]} size={2.2} speed={0.32} opacity={0.5} color={c.light} />
       <Environment resolution={envRes} frames={1}>
         <Lightformer form="rect" intensity={2.4} position={[0, 4, 3]} scale={[7, 2, 1]} />
-        <Lightformer form="rect" intensity={1.6} color={ACCENT_LIGHT} position={[-4, 1, 2]} scale={[3, 5, 1]} />
-        <Lightformer form="rect" intensity={1.1} color="#5b8cff" position={[4, -1, 3]} scale={[3, 5, 1]} />
+        <Lightformer form="rect" intensity={1.6} color={c.light} position={[-4, 1, 2]} scale={[3, 5, 1]} />
+        <Lightformer form="rect" intensity={1.1} color={c.glow} position={[4, -1, 3]} scale={[3, 5, 1]} />
       </Environment>
       <ContactShadows position={[0, -1.7, 0]} opacity={0.5} scale={11} blur={2.6} far={4} color="#000000" />
     </Canvas>

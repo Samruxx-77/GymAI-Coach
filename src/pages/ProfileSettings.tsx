@@ -1,13 +1,27 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LogOut, Save } from "lucide-react";
+import {
+  Award,
+  CalendarDays,
+  Check,
+  Flame,
+  LogOut,
+  Palette,
+  Save,
+  Target,
+  Zap,
+} from "lucide-react";
 import { Card, Button, Input, Select, Badge } from "../components/ui";
+import { Avatar, AVATARS } from "../components/Avatar";
 import { useProfile } from "../context/ProfileContext";
 import { useAuth } from "../context/AuthContext";
 import { useData } from "../context/DataContext";
+import { useTheme } from "../context/ThemeContext";
 import { calculateTargets, goalLabel } from "../lib/nutrition";
 import { rankForXp } from "../lib/gamification";
-import { formatNumber } from "../lib/utils";
+import { THEMES, THEME_IDS } from "../lib/themes";
+import { cn, formatNumber } from "../lib/utils";
+import bannerArt from "../assets/profile-banner.svg";
 import type { ActivityLevel, ExperienceLevel, Gender, Goal } from "../lib/types";
 
 export default function ProfileSettings() {
@@ -15,6 +29,7 @@ export default function ProfileSettings() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { sessions } = useData();
+  const { theme, setTheme } = useTheme();
 
   const [form, setForm] = useState({
     display_name: "",
@@ -99,33 +114,169 @@ export default function ProfileSettings() {
     }
   }
 
+  async function pickAvatar(avatarId: string) {
+    if (!profile || profile.avatar_url === `avatar:${avatarId}`) return;
+    setSaved(false);
+    await updateProfile({ avatar_url: `avatar:${avatarId}` });
+    await refresh();
+  }
+
   if (!profile) return <div className="skeleton h-64" />;
 
   const rank = rankForXp(profile.xp);
+  const memberSince = new Date(profile.created_at).toLocaleDateString(undefined, {
+    month: "short",
+    year: "numeric",
+  });
+
+  const stats = [
+    { icon: Zap, label: "Total XP", value: formatNumber(profile.xp) },
+    { icon: Target, label: "Workouts", value: String(sessions.length) },
+    { icon: Flame, label: "Streak", value: `${profile.streak_count}d` },
+    { icon: Award, label: "Best streak", value: `${profile.best_streak}d` },
+    { icon: CalendarDays, label: "Member since", value: memberSince },
+    { icon: Target, label: "Weekly goal", value: `${profile.weekly_workout_target}×` },
+  ];
 
   return (
     <div className="page-fade space-y-5">
-      <div>
-        <h1 className="display text-2xl font-bold">Profile & settings</h1>
-        <p className="text-[13px] text-ink-muted">Personal details, goals and targets.</p>
-      </div>
-
-      {/* summary */}
-      <Card>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="font-semibold text-ink">{profile.display_name}</p>
-            <p className="text-[13px] text-ink-muted">{user?.email}</p>
+      {/* ── Banner + identity ─────────────────────────────────────── */}
+      <Card className="overflow-hidden !p-0">
+        <div
+          className="profile-banner relative h-40 sm:h-48"
+          style={{ backgroundImage: `url(${bannerArt})` }}
+        >
+          <div className="profile-banner-fade absolute inset-0" />
+          <div
+            aria-hidden
+            className="absolute inset-0 opacity-60"
+            style={{
+              background:
+                "radial-gradient(420px 180px at 80% 0%, var(--color-accent-soft), transparent 70%)",
+            }}
+          />
+        </div>
+        <div className="-mt-12 flex flex-wrap items-end justify-between gap-4 px-5 pb-5 sm:px-6">
+          <div className="flex items-end gap-4">
+            <div className="rounded-3xl bg-surface-1 p-1.5 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.7)] ring-1 ring-line">
+              <Avatar avatarId={profile.avatar_url} name={profile.display_name} className="h-20 w-20 text-3xl sm:h-24 sm:w-24" />
+            </div>
+            <div className="pb-1">
+              <h1 className="display text-xl font-bold sm:text-2xl">{profile.display_name}</h1>
+              <p className="text-[13px] text-ink-muted">{user?.email}</p>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 pb-1">
             <Badge tone="accent">{rank.current.name} · {formatNumber(profile.xp)} XP</Badge>
             <Badge tone="warning">{profile.streak_count}-day streak</Badge>
-            <Badge>{sessions.length} workouts</Badge>
             <Badge tone="success">{goalLabel(profile.primary_goal)}</Badge>
           </div>
         </div>
       </Card>
 
+      {/* ── Rank progress ─────────────────────────────────────────── */}
+      <Card>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="font-semibold">Rank progress</h2>
+          <p className="text-[13px] text-ink-muted">
+            {rank.next
+              ? `${formatNumber(rank.next.minXp - profile.xp)} XP to ${rank.next.name}`
+              : "Highest rank achieved"}
+          </p>
+        </div>
+        <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-surface-3">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-accent to-accent-strong transition-[width] duration-500"
+            style={{ width: `${Math.max(4, rank.progress)}%` }}
+          />
+        </div>
+        <div className="mt-2 flex justify-between text-[12px] text-ink-faint">
+          <span>{rank.current.name}</span>
+          <span>{rank.next ? rank.next.name : "Immortal"}</span>
+        </div>
+      </Card>
+
+      {/* ── Stat tiles ────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {stats.map(({ icon: Icon, label, value }) => (
+          <Card key={label} className="card-hover p-3.5">
+            <Icon className="h-4 w-4 text-accent-300" />
+            <p className="display tnum mt-2 text-lg font-bold">{value}</p>
+            <p className="text-[12px] text-ink-muted">{label}</p>
+          </Card>
+        ))}
+      </div>
+
+      {/* ── Appearance: theme ─────────────────────────────────────── */}
+      <Card>
+        <div className="flex items-center gap-2">
+          <Palette className="h-4 w-4 text-accent-300" />
+          <h2 className="font-semibold">Appearance</h2>
+        </div>
+        <p className="mt-1 text-[13px] text-ink-muted">
+          Pick the mood of your gym. Applies instantly across the whole app.
+        </p>
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {THEME_IDS.map((id) => {
+            const t = THEMES[id];
+            const active = theme === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setTheme(id)}
+                className={cn(
+                  "theme-swatch cursor-pointer rounded-2xl border border-line bg-surface-1 p-3 text-left",
+                  active && "border-accent"
+                )}
+              >
+                {/* mini preview strip */}
+                <span className="flex h-12 overflow-hidden rounded-xl border border-line">
+                  <span className="w-1/3" style={{ background: t.surfaces[0] }} />
+                  <span className="w-1/3" style={{ background: t.surfaces[1] }} />
+                  <span className="w-1/3" style={{ background: t.accent }} />
+                </span>
+                <span className="mt-2.5 flex items-center justify-between">
+                  <span className="text-sm font-semibold text-ink">{t.name}</span>
+                  {active && <Check className="h-4 w-4 text-accent-300" />}
+                </span>
+                <span className="text-[12px] text-ink-muted">{t.tagline}</span>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* ── Avatar picker ─────────────────────────────────────────── */}
+      <Card>
+        <h2 className="font-semibold">Avatar</h2>
+        <p className="mt-1 text-[13px] text-ink-muted">
+          Choose your mark. Shown beside your name across the app.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          {AVATARS.map((a) => {
+            const active = profile.avatar_url === `avatar:${a.id}`;
+            return (
+              <button
+                key={a.id}
+                type="button"
+                aria-pressed={active}
+                title={a.name}
+                onClick={() => pickAvatar(a.id)}
+                className={cn(
+                  "theme-swatch cursor-pointer rounded-2xl border-2 p-0.5",
+                  active ? "border-accent" : "border-transparent hover:border-line"
+                )}
+              >
+                <Avatar avatarId={a.id} name={profile.display_name} className="h-14 w-14 text-xl" />
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* ── Details form ──────────────────────────────────────────── */}
       <form onSubmit={save} className="space-y-5">
         <Card>
           <h2 className="font-semibold">Personal</h2>
@@ -241,6 +392,7 @@ export default function ProfileSettings() {
         </div>
       </form>
 
+      {/* ── Account ───────────────────────────────────────────────── */}
       <Card>
         <h2 className="font-semibold">Account</h2>
         <p className="mt-1 text-[13px] text-ink-muted">

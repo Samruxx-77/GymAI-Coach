@@ -3,11 +3,45 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0B0F14" />
+    <meta name="theme-color" id="meta-theme-color" content="#0B0F14" />
+    <script>
+      // Pre-paint theme boot: prevents a flash of the wrong theme on reload.
+      // Tokens must mirror src/lib/themes.ts exactly.
+      (function () {
+        try {
+          var T = {
+            midnight: { s: ["#0b0f14", "#12161f", "#1a2030", "#232b3f"], line: "#232b3f", ink: "#f2f4f8", inkMuted: "#9aa3b2", inkFaint: "#5b6472", a300: "#a78bfa", a: "#7c5cff", aS: "#5b8cff", soft: "#7c5cff20", glow: "#5b8cff", hue: "262" },
+            ocean: { s: ["#071018", "#0c1a26", "#122535", "#1a3346"], line: "#16293a", ink: "#eef6fb", inkMuted: "#8fa8ba", inkFaint: "#4e6577", a300: "#67e8f9", a: "#06b6d4", aS: "#0ea5e9", soft: "#06b6d420", glow: "#38bdf8", hue: "200" },
+            sunset: { s: ["#120b0e", "#1c1116", "#26181e", "#33212a"], line: "#33212a", ink: "#faf3f1", inkMuted: "#b8a3a8", inkFaint: "#6e5a60", a300: "#fdba74", a: "#f97316", aS: "#fb923c", soft: "#f9731620", glow: "#fb7185", hue: "30" },
+            forest: { s: ["#0a120e", "#101c15", "#16281e", "#1f3629"], line: "#1f3629", ink: "#f0f7f2", inkMuted: "#9ab3a4", inkFaint: "#54685c", a300: "#6ee7b7", a: "#10b981", aS: "#34d399", soft: "#10b98120", glow: "#2dd4bf", hue: "160" }
+          };
+          var q = new URLSearchParams(location.search).get("theme");
+          var id = q && T[q] ? q : localStorage.getItem("gymai-theme");
+          if (!id || !T[id]) id = "midnight";
+          var t = T[id], r = document.documentElement.style, map = {
+            "--color-surface-0": t.s[0], "--color-surface-1": t.s[1], "--color-surface-2": t.s[2], "--color-surface-3": t.s[3],
+            "--color-line": t.line, "--color-ink": t.ink, "--color-ink-muted": t.inkMuted, "--color-ink-faint": t.inkFaint,
+            "--color-accent-300": t.a300, "--color-accent": t.a, "--color-accent-strong": t.aS, "--color-accent-soft": t.soft,
+            "--color-data-blue": t.glow, "--scene-hue": t.hue
+          };
+          for (var k in map) r.setProperty(k, map[k]);
+          document.documentElement.dataset.theme = id;
+          var m = document.getElementById("meta-theme-color");
+          if (m) m.content = t.s[0];
+        } catch (e) { /* default theme renders anyway */ }
+      })();
+    </script>
     <meta
       name="description"
       content="GymAI Coach — your personal fitness companion: nutrition, workouts, progress and an AI coach in your pocket."
     />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="GymAI Coach — Your Personal Fitness Companion" />
+    <meta property="og:description" content="Scan meals, track macros, follow workouts and get coaching that knows your numbers." />
+    <meta property="og:image" content="/og-image.svg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="GymAI Coach — Your Personal Fitness Companion" />
+    <meta name="twitter:description" content="Scan meals, track macros, follow workouts and get coaching that knows your numbers." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>GymAI Coach — Your Personal Fitness Companion</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
