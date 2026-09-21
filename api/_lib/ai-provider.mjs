@@ -145,9 +145,13 @@ async function callOpenRouter({ systemPrompt, messages, imageBase64, json, timeo
       errors.push(`${model}: ${err?.message || err}`);
     }
   }
-  throw new ProviderError(`All OpenRouter models failed. ${errors.join(" | ")}`, {
+  const exhausted = new ProviderError(`All OpenRouter models failed. ${errors.join(" | ")}`, {
     status: 502,
   });
+  // Safe, user-facing explanation — survives the 5xx sanitizer in errorResponse.
+  exhausted.userMessage =
+    "The free AI models are busy right now. Please wait a moment and try again.";
+  throw exhausted;
 }
 
 /** Detect the image MIME type from base64 magic bytes (default: jpeg). */
