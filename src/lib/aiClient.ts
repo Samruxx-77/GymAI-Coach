@@ -35,35 +35,52 @@ export interface CoachResponse {
   fallbackUsed: boolean;
 }
 
+const TRANSIENT_STATUSES = new Set([408, 429, 502, 503, 504]);
+
 async function postJson<T>(url: string, body: unknown, timeoutMs = 30_000): Promise<T> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    // The server verifies this token before spending AI quota.
-    const { data: sess } = await supabase.auth.getSession();
-    const token = sess.session?.access_token;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data?.error || `Request failed (${res.status})`);
+  let lastErr: unknown = null;
+  // Free-tier models hiccup (rate limits, cold starts, slow reasoning) often
+  // enough that one automatic retry smooths out most transient failures.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 1500));
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      // The server verifies this token before spending AI quota.
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const err = new Error(data?.error || `Request failed (${res.status})`) as Error & { status?: number };
+        err.status = res.status;
+        throw err;
+      }
+      return data as T;
+    } catch (err) {
+      lastErr = err;
+      const status = (err as { status?: number } | null)?.status;
+      const transient =
+        (err instanceof DOMException && err.name === "AbortError") ||
+        err instanceof TypeError || // network failure
+        (typeof status === "number" && TRANSIENT_STATUSES.has(status));
+      if (!transient || attempt === 1) break;
+    } finally {
+      clearTimeout(timeout);
     }
-    return data as T;
-  } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") {
-      throw new Error("The AI is taking too long to respond. Please try again.");
-    }
-    throw err;
-  } finally {
-    clearTimeout(timeout);
   }
+  if (lastErr instanceof DOMException && lastErr.name === "AbortError") {
+    throw new Error("The AI is taking too long to respond. Please try again.");
+  }
+  throw lastErr;
 }
 
 export function askCoach(messages: CoachMessage[], context: CoachContext): Promise<CoachResponse> {
