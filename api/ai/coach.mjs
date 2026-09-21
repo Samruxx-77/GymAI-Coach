@@ -9,7 +9,7 @@
  * the text context the client assembled from its own session data.
  */
 import { runCompletion } from "../_lib/ai-provider.mjs";
-import { validateCoachBody, errorResponse, json } from "../_lib/validate.mjs";
+import { validateCoachBody, errorResponse, json, readJsonBody } from "../_lib/validate.mjs";
 
 function buildSystemPrompt(context) {
   const c = context || {};
@@ -56,6 +56,7 @@ function buildSystemPrompt(context) {
 
 export default async function handleCoach(req, res, body) {
   try {
+    body = await readJsonBody(req, body);
     const check = validateCoachBody(body);
     if (check.error) return json(res, 400, { error: check.error });
 

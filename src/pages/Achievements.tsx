@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from "react";
 import { Award, Crown, Flame, Lock, Medal, Scale, Star, Target, Trophy, Utensils, Zap } from "lucide-react";
 import { Card, Badge, ProgressBar } from "../components/ui";
 import { useData } from "../context/DataContext";
@@ -21,12 +22,23 @@ const TIER_STYLES: Record<string, string> = {
 };
 
 export default function Achievements() {
-  const { achievements, userAchievements, sessions, foodEntries, weightEntries } = useData();
+  const { achievements, userAchievements, sessions, foodEntries, weightEntries, refresh } = useData();
   const { profile } = useProfile();
 
+  // Re-evaluate on every visit so unlocks earned elsewhere (or while this
+  // page was closed) show up immediately — never a stale eligibility view.
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
   const rank = rankForXp(profile?.xp ?? 0);
-  const unlockedIds = new Set(userAchievements.map((ua) => ua.achievement_id));
-  const unlocked = achievements.filter((a) => unlockedIds.has(a.id));
+  const unlockedIds = useMemo(
+    () => new Set(userAchievements.map((ua) => ua.achievement_id)),
+    [userAchievements]
+  );
+  // Both the header count and the grid derive from this one list, so the
+  // "N/M unlocked" figure always matches the badges actually displayed.
+  const unlockedBadges = achievements.filter((a) => unlockedIds.has(a.id));
 
   const loggingDays = new Set(foodEntries.map((f) => f.entry_date)).size;
 
@@ -76,7 +88,7 @@ export default function Achievements() {
       <div>
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-ink">Badges</h2>
-          <span className="text-[13px] text-ink-muted">{unlocked.length}/{achievements.length} unlocked</span>
+          <span className="text-[13px] text-ink-muted">{unlockedBadges.length}/{achievements.length} unlocked</span>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {achievements.map((a) => {
@@ -98,11 +110,11 @@ export default function Achievements() {
                 </div>
                 <p className="text-[14px] font-semibold text-ink">{a.name}</p>
                 <p className="text-[12px] leading-snug text-ink-muted">{a.description}</p>
-                {isUnlocked ? (
-                  <Badge tone="accent">+{a.xp_reward} XP</Badge>
-                ) : (
-                  <Badge>{a.tier}</Badge>
-                )}
+                {/* consistent for every badge: tier pill + XP reward line */}
+                <Badge tone={isUnlocked ? "accent" : "default"}>{a.tier}</Badge>
+                <span className={cn("text-[11px] font-medium", isUnlocked ? "text-accent-300" : "text-ink-faint")}>
+                  +{a.xp_reward} XP
+                </span>
               </div>
             );
           })}

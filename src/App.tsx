@@ -2,7 +2,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ProfileProvider } from "./context/ProfileContext";
 import { DataProvider } from "./context/DataContext";
-import { RequireAuth, AuthGate } from "./components/AuthGuard";
+import { RequireAuth, AuthGate, RedirectIfAuthed } from "./components/AuthGuard";
 import { AppLayout } from "./components/AppLayout";
 import { useProfile } from "./context/ProfileContext";
 import Landing from "./pages/Landing";
@@ -62,7 +62,7 @@ export default function App() {
     <AuthProvider>
         <Routes>
           <Route path="/" element={<Landing />} />
-          <Route path="/auth" element={<Auth />} />
+          <Route path="/auth" element={<RedirectIfAuthed><Auth /></RedirectIfAuthed>} />
           <Route
             path="/onboarding"
             element={

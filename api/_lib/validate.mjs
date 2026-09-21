@@ -7,12 +7,35 @@ export function json(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
+/**
+ * Read and parse a JSON request body.
+ *
+ * Serverless runtimes (Vercel Node functions) do NOT pre-parse the body —
+ * handlers receive the raw IncomingMessage — so every POST route must read
+ * it itself. The local dev server passes a pre-parsed body as the third
+ * handler argument; reading here is safe there too (the stream is already
+ * consumed, so this returns the parsed value via the handler contract).
+ */
+export async function readJsonBody(req, preParsed) {
+  if (preParsed !== undefined) return preParsed;
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  if (!chunks.length) return {};
+  try {
+    const raw = Buffer.concat(chunks).toString("utf8");
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return undefined; // signals invalid JSON → route responds 400
+  }
+}
+
 export function clientError(res, message, status = 400) {
   json(res, status, { error: message });
 }
 
 /** Validate the coach request body: { messages: [{ role, content }] }. */
 export function validateCoachBody(body) {
+  if (body === undefined) return { error: "invalid JSON body" };
   const messages = body?.messages;
   if (!Array.isArray(messages) || messages.length === 0) {
     return { error: "messages array is required" };
@@ -33,6 +56,7 @@ export function validateCoachBody(body) {
 
 /** Validate the food-scan request body: { imageBase64 }. */
 export function validateFoodBody(body) {
+  if (body === undefined) return { error: "invalid JSON body" };
   const imageBase64 = body?.imageBase64;
   if (typeof imageBase64 !== "string" || imageBase64.length < 500) {
     return { error: "imageBase64 is required" };

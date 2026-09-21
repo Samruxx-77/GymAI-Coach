@@ -6,6 +6,7 @@ import { askCoach } from "../lib/aiClient";
 import { useData } from "../context/DataContext";
 import { useProfile } from "../context/ProfileContext";
 import { supabase } from "../lib/supabase";
+import { recomputeXpCache } from "../lib/xp";
 import { cn } from "../lib/utils";
 
 const SUGGESTIONS = [
@@ -129,13 +130,15 @@ function CoachInner() {
             ]);
             await supabase.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", convId);
           }
-          // ai_chat XP: once per day via daily dedupe
+          // ai_chat XP: once per day via daily dedupe; keep the cached
+          // total in sync like every other award path.
           await supabase
             .from("xp_events")
             .upsert(
               { user_id: auth.user.id, source: "ai_chat", ref_id: null, day: new Date().toISOString().slice(0, 10) },
               { onConflict: "user_id,source,day", ignoreDuplicates: true }
             );
+          await recomputeXpCache(auth.user.id);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "The coach is unavailable right now.");

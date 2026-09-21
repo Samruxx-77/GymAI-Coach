@@ -12,21 +12,22 @@ import { rankForXp } from "../lib/gamification";
 import { dailyInsight, todayMission } from "../lib/insights";
 import { goalLabel } from "../lib/nutrition";
 import { formatNumber, goalProgressPercent, todayKey } from "../lib/utils";
-import type { AchievementStats } from "../lib/gamification";
-import { checkAndUnlockAchievements } from "../lib/xpUser";
 import { supabase } from "../lib/supabase";
+import { recomputeXpCache } from "../lib/xp";
 
 export default function Dashboard() {
   const { profile } = useProfile();
   const { user } = useAuth();
   const {
     today, latestWeight, weightTrendKg, weekWorkoutCount, workoutDoneToday,
-    foodEntries, weightEntries, sessions, xpEvents, userAchievements, achievements, loading,
+    xpEvents, loading,
   } = useData();
 
   const rank = rankForXp(profile?.xp ?? 0);
 
   /* ── daily login XP (once per day, server-enforced) ─────────── */
+  // Badge evaluation runs centrally in DataContext after every data
+  // refresh, so unlocks and their XP rewards land on any page.
   useEffect(() => {
     if (!user || loading) return;
     const todayRows = xpEvents.filter((e) => e.day === todayKey() && e.source === "daily_login");
@@ -34,37 +35,11 @@ export default function Dashboard() {
       supabase
         .from("xp_events")
         .insert({ user_id: user.id, source: "daily_login", ref_id: null, day: todayKey() })
-        .then(() => void 0);
+        .then(async ({ error }) => {
+          if (!error) await recomputeXpCache(user.id);
+        });
     }
   }, [user, loading, xpEvents]);
-
-  /* ── achievement evaluation (real stats only) ───────────────── */
-  useEffect(() => {
-    if (!user || loading || !profile) return;
-    const loggingDays = new Set(foodEntries.map((f) => f.entry_date)).size;
-    const stats: AchievementStats = {
-      workoutSessions: sessions.length,
-      weightEntries: weightEntries.length,
-      foodEntries: foodEntries.length,
-      foodLoggingDays: loggingDays,
-      aiScans: foodEntries.filter((f) => f.source === "ai_scan").length,
-      streak: profile.streak_count,
-      xp: profile.xp,
-      proteinTargetDays: 0,
-      calorieTargetDays: 0,
-      goalWeightReached:
-        profile.start_weight_kg != null &&
-        profile.target_weight_kg != null &&
-        profile.current_weight_kg != null &&
-        (profile.primary_goal === "lose_weight"
-          ? profile.current_weight_kg <= profile.target_weight_kg
-          : profile.primary_goal === "build_muscle"
-            ? profile.current_weight_kg >= profile.target_weight_kg
-            : false),
-      onboarding: profile.onboarding_completed,
-    };
-    void checkAndUnlockAchievements(user.id, achievements, userAchievements, stats);
-  }, [user, loading, profile, achievements, userAchievements, foodEntries, weightEntries, sessions]);
 
   const insight = useMemo(
     () =>

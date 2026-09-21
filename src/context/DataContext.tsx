@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -23,7 +24,9 @@ import type {
 } from "../lib/types";
 import { todayKey } from "../lib/utils";
 import { useProfile } from "./ProfileContext";
-import { XP_VALUES } from "../lib/gamification";
+import { XP_VALUES, type AchievementStats } from "../lib/gamification";
+import { checkAndUnlockAchievements } from "../lib/xpUser";
+import { recomputeXpCache } from "../lib/xp";
 
 export interface DailySummary {
   calories: number;
@@ -143,6 +146,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Latest profile without adding it to fetchAll's dependencies.
+  const profileRef = useRef(profile);
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
+
   const fetchAll = useCallback(async () => {
     if (!user) {
       setWeight([]); setFood([]); setExercises([]); setWorkoutRows([]);
@@ -173,6 +182,40 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setXpEvents((xp.data ?? []) as XpRowLite[]);
       setAchievements((ach.data ?? []) as Achievement[]);
       setUserAchievements((uach.data ?? []) as UserAchievement[]);
+
+      // Evaluate badges against the fresh server state so unlocks and
+      // their XP rewards land no matter which page triggered the refresh.
+      const p = profileRef.current;
+      if (p) {
+        const meals = (f.data ?? []) as FoodEntry[];
+        const stats: AchievementStats = {
+          workoutSessions: ((se.data ?? []) as WorkoutSession[]).length,
+          weightEntries: ((w.data ?? []) as WeightEntry[]).length,
+          foodEntries: meals.length,
+          foodLoggingDays: new Set(meals.map((x) => x.entry_date)).size,
+          aiScans: meals.filter((x) => x.source === "ai_scan").length,
+          streak: p.streak_count,
+          xp: p.xp,
+          proteinTargetDays: 0,
+          calorieTargetDays: 0,
+          goalWeightReached:
+            p.start_weight_kg != null &&
+            p.target_weight_kg != null &&
+            p.current_weight_kg != null &&
+            (p.primary_goal === "lose_weight"
+              ? p.current_weight_kg <= p.target_weight_kg
+              : p.primary_goal === "build_muscle"
+                ? p.current_weight_kg >= p.target_weight_kg
+                : false),
+          onboarding: p.onboarding_completed,
+        };
+        await checkAndUnlockAchievements(
+          user.id,
+          (ach.data ?? []) as Achievement[],
+          (uach.data ?? []) as UserAchievement[],
+          stats
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
@@ -194,8 +237,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
         .upsert(
           { user_id: user.id, source, ref_id: refId, day: todayKey() },
           { onConflict: "user_id,source,ref_id,day", ignoreDuplicates: true }
-        )
-        .then(() => void fetchAll());
+        );
+      // Keep profiles.xp (the cached total the UI reads) in sync.
+      await recomputeXpCache(user.id);
+      await fetchAll();
     },
     [user, fetchAll]
   );

@@ -14,7 +14,7 @@
  * for user review before logging.
  */
 import { runCompletion } from "../_lib/ai-provider.mjs";
-import { validateFoodBody, extractJson, errorResponse, json } from "../_lib/validate.mjs";
+import { validateFoodBody, extractJson, errorResponse, json, readJsonBody } from "../_lib/validate.mjs";
 
 const SYSTEM_PROMPT = `You are a nutrition estimation service. Analyze the food in the photo and estimate its nutritional content.
 
@@ -82,6 +82,7 @@ function normalizeEstimate(raw) {
 
 export default async function handleFood(req, res, body) {
   try {
+    body = await readJsonBody(req, body);
     const check = validateFoodBody(body);
     if (check.error) return json(res, 400, { error: check.error });
 
