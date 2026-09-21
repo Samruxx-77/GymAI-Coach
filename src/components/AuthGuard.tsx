@@ -14,16 +14,16 @@ export function AuthGate() {
 }
 
 /**
- * Redirects signed-in users away from the auth page to the app
- * (or their intended ?returnTo= destination).
+ * Redirects signed-in users away from a public page (auth, landing)
+ * to the app. Honors ?returnTo= / ?next= as the destination.
  */
 export function RedirectIfAuthed({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
   const location = useLocation();
   if (loading) return <AuthGate />;
   if (session) {
-    const returnTo = location.search.match(/[?&]returnTo=([^&]+)/)?.[1];
-    const dest = returnTo ? decodeURIComponent(returnTo) : "/app";
+    const params = new URLSearchParams(location.search);
+    const dest = params.get("next") ?? params.get("returnTo") ?? "/app";
     return <Navigate to={dest} replace />;
   }
   return <>{children}</>;

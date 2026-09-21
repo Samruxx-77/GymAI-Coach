@@ -61,7 +61,7 @@ export default function App() {
   return (
     <AuthProvider>
         <Routes>
-          <Route path="/" element={<Landing />} />
+          <Route path="/" element={<RedirectIfAuthed><Landing /></RedirectIfAuthed>} />
           <Route path="/auth" element={<RedirectIfAuthed><Auth /></RedirectIfAuthed>} />
           <Route
             path="/onboarding"

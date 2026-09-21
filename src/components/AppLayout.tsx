@@ -52,8 +52,21 @@ function SideItem({ to, label, icon: Icon, end }: { to: string; label: string; i
 }
 
 /** Mobile bottom-nav item (compact, icon-over-label). */
-function BottomItem({ to, label, icon: Icon, end }: { to: string; label: string; icon: typeof Activity; end?: boolean }) {
-  const primary = ["/app", "/app/nutrition", "/app/workouts", "/app/coach", "/app/profile"];
+function BottomItem({
+  to,
+  label,
+  icon: Icon,
+  end,
+  accent,
+}: {
+  to: string;
+  label: string;
+  icon: typeof Activity;
+  end?: boolean;
+  /** Subtle distinction: icon keeps the accent tint at all times. */
+  accent?: boolean;
+}) {
+  const primary = ["/app", "/app/nutrition", "/app/scan", "/app/workouts", "/app/coach", "/app/profile"];
   if (!primary.includes(to)) return null;
   return (
     <NavLink
@@ -66,36 +79,10 @@ function BottomItem({ to, label, icon: Icon, end }: { to: string; label: string;
         )
       }
     >
-      <Icon className="h-5 w-5" />
-      {label}
-    </NavLink>
-  );
-}
-
-/** Prominent raised scan button centered in the mobile bottom nav. */
-function CenterScanButton() {
-  return (
-    <NavLink
-      to="/app/scan"
-      aria-label="Scan food"
-      className={({ isActive }) =>
-        cn(
-          "relative -mt-7 flex flex-col items-center px-2",
-          isActive ? "text-accent-300" : "text-ink-faint"
-        )
-      }
-    >
       {({ isActive }) => (
         <>
-          <span
-            className={cn(
-              "flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-white shadow-[0_10px_26px_-8px_var(--color-accent)] ring-4 ring-surface-0 transition-transform active:scale-95",
-              isActive && "bg-accent-300 text-ink"
-            )}
-          >
-            <ScanLine className="h-6 w-6" />
-          </span>
-          <span className="mt-1 text-[10px] font-medium">Scan</span>
+          <Icon className={cn("h-5 w-5", accent && !isActive && "text-accent-300")} />
+          {label}
         </>
       )}
     </NavLink>
@@ -174,11 +161,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      {/* Mobile bottom nav — 5 tabs + raised center scan button */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-end justify-around border-t border-line bg-surface-0/95 pt-1 pb-[max(env(safe-area-inset-bottom),4px)] backdrop-blur lg:hidden">
+      {/* Mobile bottom nav — six in-bar tabs, scan accent-tinted */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-line bg-surface-0/95 pt-1 pb-[max(env(safe-area-inset-bottom),4px)] backdrop-blur lg:hidden">
         <BottomItem to="/app" label="Home" icon={Activity} end />
         <BottomItem to="/app/nutrition" label="Nutrition" icon={ChefHat} />
-        <CenterScanButton />
+        <BottomItem to="/app/scan" label="Scan" icon={ScanLine} accent />
         <BottomItem to="/app/workouts" label="Workouts" icon={Dumbbell} />
         <BottomItem to="/app/coach" label="Coach" icon={MessageCircle} />
         <BottomItem to="/app/profile" label="Profile" icon={UserIcon} />
