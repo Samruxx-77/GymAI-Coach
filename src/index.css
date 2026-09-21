@@ -209,6 +209,78 @@ h1, h2, h3 {
 }
 .stat-chip-2 { animation-delay: -2s; }
 .stat-chip-3 { animation-delay: -4s; }
+
+/* ══ Theme engine ════════════════════════════════════════════════ */
+
+/* Smooth cross-fade when switching themes (token-driven, zero JS) */
+body,
+.card,
+.field,
+.theme-scene {
+  transition: background-color 300ms ease, color 300ms ease, border-color 300ms ease;
+}
+
+/* Ambient page scene: accent glows on the theme's base surface */
+.theme-scene {
+  background:
+    radial-gradient(900px 520px at 12% -8%, var(--color-accent-soft), transparent 65%),
+    radial-gradient(720px 430px at 88% 20%, color-mix(in oklab, var(--color-data-blue) 12%, transparent), transparent 70%),
+    var(--color-surface-0);
+}
+
+/* Frosted glass panel (navs, overlays, floating cards) */
+.theme-glass {
+  background: color-mix(in oklab, var(--color-surface-1) 74%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid color-mix(in oklab, var(--color-line) 85%, transparent);
+}
+
+/* Theme picker swatches */
+.theme-swatch {
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+.theme-swatch:hover { transform: translateY(-2px); }
+.theme-swatch[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent), 0 6px 18px -6px var(--color-accent);
+}
+
+::selection {
+  background: var(--color-accent-soft);
+}
+
+/* ── Profile banner: gym scene photo backdrop ─────────────────── */
+.profile-banner {
+  background-size: cover;
+  background-position: center 30%;
+}
+.profile-banner-fade {
+  background: linear-gradient(
+    to top,
+    var(--color-surface-1) 4%,
+    color-mix(in oklab, var(--color-surface-1) 55%, transparent) 45%,
+    transparent 100%
+  );
+}
+
+/* ── Marquee (landing social proof) ───────────────────────────── */
+.marquee {
+  display: flex;
+  gap: 3.5rem;
+  width: max-content;
+  animation: marquee 32s linear infinite;
+}
+@keyframes marquee {
+  to { transform: translateX(-50%); }
+}
+.marquee-mask {
+  mask-image: linear-gradient(to right, transparent, black 12%, black 88%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 12%, black 88%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee { animation: none; }
+}
 @keyframes chip-float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-8px); }

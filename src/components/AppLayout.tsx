@@ -14,6 +14,7 @@ import {
 import { cn, formatNumber } from "../lib/utils";
 import { rankForXp } from "../lib/gamification";
 import { useProfile } from "../context/ProfileContext";
+import { Avatar } from "./Avatar";
 import { Logo } from "./Logo";
 
 const NAV = [
@@ -52,7 +53,7 @@ function SideItem({ to, label, icon: Icon, end }: { to: string; label: string; i
 
 /** Mobile bottom-nav item (compact, icon-over-label). */
 function BottomItem({ to, label, icon: Icon, end }: { to: string; label: string; icon: typeof Activity; end?: boolean }) {
-  const primary = ["/app", "/app/nutrition", "/app/workouts", "/app/coach"];
+  const primary = ["/app", "/app/nutrition", "/app/workouts", "/app/coach", "/app/profile"];
   if (!primary.includes(to)) return null;
   return (
     <NavLink
@@ -89,7 +90,21 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className="border-t border-line p-4">
-          <div className="flex items-center gap-2 text-[13px]">
+          <button
+            className="flex w-full cursor-pointer items-center gap-3 rounded-xl p-1.5 text-left transition-colors hover:bg-surface-2"
+            onClick={() => navigate("/app/profile")}
+          >
+            <Avatar
+              avatarId={profile?.avatar_url}
+              name={profile?.display_name}
+              className="h-10 w-10 text-lg"
+            />
+            <div className="min-w-0">
+              <p className="truncate text-[13px] font-semibold text-ink">{profile?.display_name ?? "Member"}</p>
+              <p className="text-[12px] text-ink-faint">{rank.current.name}</p>
+            </div>
+          </button>
+          <div className="mt-3 flex items-center gap-2 text-[13px]">
             <Flame className="h-4 w-4 text-data-amber" />
             <span className="font-semibold text-ink">{profile?.streak_count ?? 0}</span>
             <span className="text-ink-faint">day streak</span>
@@ -103,9 +118,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Mobile top bar */}
-      <header className="fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-line bg-surface-0/90 px-4 py-3 backdrop-blur lg:hidden">
+      <header className="theme-glass fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-line px-4 py-3 lg:hidden">
         <Logo compact />
-        <div className="flex items-center gap-3 text-[13px]">
+        <button className="flex cursor-pointer items-center gap-3 text-[13px]" onClick={() => navigate("/app/profile")}>
           <span className="flex items-center gap-1 font-semibold">
             <Flame className="h-4 w-4 text-data-amber" />
             {profile?.streak_count ?? 0}
@@ -114,7 +129,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <Zap className="h-4 w-4 text-accent-300" />
             {formatNumber(profile?.xp ?? 0)}
           </span>
-        </div>
+          <Avatar
+            avatarId={profile?.avatar_url}
+            name={profile?.display_name}
+            className="h-9 w-9 rounded-full text-base"
+          />
+        </button>
       </header>
 
       {/* Content */}

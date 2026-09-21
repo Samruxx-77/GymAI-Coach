@@ -17,6 +17,16 @@ import { Logo } from "../components/Logo";
 import { useAuth } from "../context/AuthContext";
 import { prefersReducedMotion } from "../lib/env";
 import Hero3D from "../components/three/Hero3D";
+import heroArt from "../assets/hero-gym.svg";
+
+const STATS = [
+  { icon: Dumbbell, value: "42", label: "guided exercises" },
+  { icon: Trophy, value: "22", label: "achievements to unlock" },
+  { icon: Zap, value: "6", label: "ranks from Bronze to Immortal" },
+  { icon: MessageCircle, value: "AI", label: "coach that knows your numbers" },
+  { icon: ScanLine, value: "1-tap", label: "food scanner with macros" },
+  { icon: LineChart, value: "Daily", label: "progress you can see" },
+];
 
 const FEATURES = [
   { icon: ScanLine, title: "AI Food Scanner", body: "Photograph any meal and get instant calorie and macro estimates you can correct before logging." },
@@ -65,7 +75,7 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-surface-0 text-ink">
       {/* Nav */}
-      <header className="sticky top-0 z-40 border-b border-line/60 bg-surface-0/80 backdrop-blur">
+      <header className="theme-glass sticky top-0 z-40 border-b border-line/60">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3.5">
           <Logo />
           <div className="flex items-center gap-2">
@@ -75,10 +85,15 @@ export default function Landing() {
         </div>
       </header>
 
-      {/* Hero — copy left, 3D stage right */}
+      {/* Hero — gym-scene backdrop, copy left, 3D stage right */}
       <section className="relative overflow-hidden">
+        {/* moody gym photograph backdrop, fading seamlessly into the page */}
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute inset-0 bg-cover bg-[position:center_35%] opacity-[0.4]" style={{ backgroundImage: `url(${heroArt})` }} />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, color-mix(in oklab, var(--color-surface-0) 35%, transparent) 0%, transparent 32%, var(--color-surface-0) 94%)" }} />
+        </div>
         <div aria-hidden className="pointer-events-none absolute inset-0"
-          style={{ background: "radial-gradient(900px 500px at 15% -10%, var(--color-accent-soft), transparent), radial-gradient(700px 420px at 85% 25%, rgba(91,140,255,0.10), transparent)" }} />
+          style={{ background: "radial-gradient(900px 500px at 15% -10%, var(--color-accent-soft), transparent), radial-gradient(700px 420px at 85% 25%, color-mix(in oklab, var(--color-data-blue) 10%, transparent), transparent)" }} />
         {/* faint grid floor to anchor the 3D stage */}
         <div aria-hidden className="hero-grid pointer-events-none absolute inset-x-0 bottom-0 h-[420px] opacity-[0.14]" />
 
@@ -140,6 +155,19 @@ export default function Landing() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Facts marquee */}
+      <section aria-label="What's inside" className="marquee-mask overflow-hidden border-y border-line bg-surface-1/40 py-4">
+        <div className="marquee">
+          {[...STATS, ...STATS].map((s, i) => (
+            <div key={i} className="flex items-center gap-2.5 whitespace-nowrap">
+              <s.icon className="h-4 w-4 text-accent-300" />
+              <span className="display tnum text-base font-bold">{s.value}</span>
+              <span className="text-[13px] text-ink-muted">{s.label}</span>
+            </div>
+          ))}
         </div>
       </section>
 

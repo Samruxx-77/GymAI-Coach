@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Button, Input } from "../components/ui";
+import authArt from "../assets/auth-scene.svg";
 import { Logo } from "../components/Logo";
 
 type Mode = "login" | "signup" | "forgot" | "reset";
@@ -119,16 +120,16 @@ function AuthForm({ mode, setMode }: { mode: Mode; setMode: (m: Mode) => void })
           <>
             <p>
               No account?{" "}
-              <button className="font-medium text-accent-300 hover:underline" onClick={() => setMode("signup")}>Sign up</button>
+              <button type="button" className="font-medium text-accent-300 hover:underline" onClick={() => setMode("signup")}>Sign up</button>
             </p>
             <p>
-              <button className="hover:underline" onClick={() => setMode("forgot")}>Forgot password?</button>
+              <button type="button" className="hover:underline" onClick={() => setMode("forgot")}>Forgot password?</button>
             </p>
           </>
         )}
         {(mode === "signup" || mode === "forgot" || mode === "reset") && (
           <p>
-            <button className="font-medium text-accent-300 hover:underline" onClick={() => setMode("login")}>← Back to login</button>
+            <button type="button" className="font-medium text-accent-300 hover:underline" onClick={() => setMode("login")}>← Back to login</button>
           </p>
         )}
       </div>
@@ -140,10 +141,13 @@ export default function Auth() {
   const [mode, setMode] = useMode();
   return (
     <div className="flex min-h-screen bg-surface-0">
-      {/* Left: brand panel */}
+      {/* Left: brand panel over the gym scene */}
       <div className="relative hidden flex-1 flex-col justify-between overflow-hidden border-r border-line p-10 lg:flex">
-        <div aria-hidden className="pointer-events-none absolute inset-0 opacity-40"
-          style={{ background: "radial-gradient(600px 400px at 20% 10%, var(--color-accent-soft), transparent), radial-gradient(500px 500px at 80% 90%, rgba(91,140,255,0.12), transparent)" }} />
+        {/* gym photograph backdrop, fading into the surface */}
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute inset-0 bg-cover bg-center opacity-[0.45]" style={{ backgroundImage: `url(${authArt})` }} />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to top, var(--color-surface-0) 6%, transparent 45%), radial-gradient(600px 400px at 20% 10%, var(--color-accent-soft), transparent), radial-gradient(500px 500px at 80% 90%, color-mix(in oklab, var(--color-data-blue) 12%, transparent), transparent)" }} />
+        </div>
         <Logo />
         <div className="relative max-w-md">
           <h2 className="display text-3xl font-bold leading-tight text-ink">
