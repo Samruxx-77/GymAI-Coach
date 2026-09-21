@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
 import { MessageCircle, Send, Trash2 } from "lucide-react";
 import { Card, Button, Textarea } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
@@ -19,6 +21,26 @@ const SUGGESTIONS = [
 
 export default function Coach() {
   return <CoachInner />;
+}
+
+/**
+ * Assistant bubbles render markdown (bold, lists, line breaks).
+ * react-markdown renders to React elements — raw HTML in model output
+ * is never injected, so this is injection-safe by construction.
+ */
+function Markdown({ text }: { text: string }) {
+  return (
+    <div className="space-y-2 [&_a]:underline [&_h1]:text-[15px] [&_h1]:font-semibold [&_h2]:text-[15px] [&_h2]:font-semibold [&_h3]:text-[15px] [&_h3]:font-semibold [&_li]:ml-4 [&_li]:list-disc [&_ol>li]:list-decimal [&_p]:leading-relaxed [&_strong]:font-semibold">
+      <ReactMarkdown
+        remarkPlugins={[remarkBreaks]}
+        components={{
+          a: (props) => <a {...props} target="_blank" rel="noopener noreferrer" />,
+        }}
+      >
+        {text}
+      </ReactMarkdown>
+    </div>
+  );
 }
 
 function CoachInner() {
@@ -191,13 +213,13 @@ function CoachInner() {
               <div key={m.id} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
                 <div
                   className={cn(
-                    "max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed",
+                    "max-w-[85%] rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed",
                     m.role === "user"
-                      ? "bg-accent text-white"
+                      ? "whitespace-pre-wrap bg-accent text-white"
                       : "bg-surface-2 text-ink"
                   )}
                 >
-                  {m.content}
+                  {m.role === "assistant" ? <Markdown text={m.content} /> : m.content}
                 </div>
               </div>
             ))
