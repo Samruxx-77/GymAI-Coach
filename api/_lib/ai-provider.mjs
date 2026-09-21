@@ -17,6 +17,8 @@
  */
 
 const TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS || 40_000);
+/** Vision/food analysis needs a roomier budget than text chat. */
+const FOOD_TIMEOUT_MS = Number(process.env.AI_FOOD_TIMEOUT_MS || 90_000);
 
 class ProviderError extends Error {
   constructor(message, { status, provider } = {}) {
@@ -38,8 +40,8 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function fetchJson(url, options) {
-  const res = await fetch(url, { ...options, signal: timeoutSignal(TIMEOUT_MS) });
+async function fetchJson(url, options, timeoutMs) {
+  const res = await fetch(url, { ...options, signal: timeoutSignal(timeoutMs ?? TIMEOUT_MS) });
   const text = await res.text();
   let json = null;
   try {
@@ -75,7 +77,7 @@ function orModelChain({ imageBase64 }) {
   return chain.length > 1 ? chain : null; // null → plain `model` field
 }
 
-async function orOnce(body) {
+async function orOnce(body, timeoutMs) {
   const base = (process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1").replace(/\/$/, "");
   return fetchJson(`${base}/chat/completions`, {
     method: "POST",
@@ -86,7 +88,7 @@ async function orOnce(body) {
       "X-Title": "GymAI Coach",
     },
     body: JSON.stringify(body),
-  });
+  }, timeoutMs);
 }
 
 /** Detect the image MIME type from base64 magic bytes (default: jpeg). */
@@ -97,7 +99,7 @@ function sniffImageMime(b64) {
   return "image/jpeg";
 }
 
-async function callOpenRouter({ systemPrompt, messages, imageBase64, json }) {
+async function callOpenRouter({ systemPrompt, messages, imageBase64, json, timeoutMs }) {
   if (!process.env.OPENROUTER_API_KEY) {
     throw new ProviderError("OPENROUTER_API_KEY is not configured", { status: 501 });
   }
@@ -130,12 +132,12 @@ async function callOpenRouter({ systemPrompt, messages, imageBase64, json }) {
 
   let data;
   try {
-    data = await orOnce(body);
+    data = await orOnce(body, timeoutMs);
   } catch (err) {
     // Free models share an upstream pool — a single brief retry absorbs most 429s.
     if ((err?.status === 429 || err?.status === 408) && modelChain) {
       await sleep(1200);
-      data = await orOnce(body);
+      data = await orOnce(body, timeoutMs);
     } else {
       throw err;
     }
@@ -217,6 +219,9 @@ async function callGemini({ systemPrompt, messages, imageBase64, json }) {
  * @returns {Promise<{text: string, provider: string, fallbackUsed: boolean}>}
  */
 export async function runCompletion(params) {
+  // Vision requests (food scans) reason over large images on free-tier
+  // models — allow a per-call timeout override so they can finish.
+  const timeoutMs = params.timeoutMs ?? (params.imageBase64 ? FOOD_TIMEOUT_MS : TIMEOUT_MS);
   const attempts = [callOpenRouter, callGemini];
   const errors = [];
   for (const [i, fn] of attempts.entries()) {
@@ -237,4 +242,4 @@ export async function runCompletion(params) {
   throw err;
 }
 
-export { ProviderError, TIMEOUT_MS };
+export { ProviderError, TIMEOUT_MS, FOOD_TIMEOUT_MS };

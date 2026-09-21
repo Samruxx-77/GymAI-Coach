@@ -53,6 +53,8 @@ interface DataContextValue {
 
   // mutations
   addWeight: (date: string, kg: number, note?: string) => Promise<{ error: string | null }>;
+  updateWeight: (id: string, kg: number, note: string | null) => Promise<{ error: string | null }>;
+  deleteWeight: (id: string) => Promise<{ error: string | null }>;
   addFood: (input: NewFoodInput) => Promise<{ error: string | null }>;
   deleteFood: (id: string) => Promise<{ error: string | null }>;
   saveWorkout: (
@@ -268,6 +270,34 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [user, profile, updateProfile, awardXp, fetchAll]
   );
 
+  const updateWeight = useCallback(
+    async (id: string, kg: number, note: string | null) => {
+      const { error: err } = await supabase
+        .from("weight_entries")
+        .update({ weight_kg: kg, note })
+        .eq("id", id);
+      if (err) return { error: err.message };
+      // If this is today's row, keep the profile cache in sync.
+      const row = weightEntries.find((w) => w.id === id);
+      if (row && row.entry_date === todayKey() && profile) {
+        await updateProfile({ current_weight_kg: kg });
+      }
+      await fetchAll();
+      return { error: null };
+    },
+    [weightEntries, profile, updateProfile, fetchAll]
+  );
+
+  const deleteWeight = useCallback(
+    async (id: string) => {
+      const { error: err } = await supabase.from("weight_entries").delete().eq("id", id);
+      if (err) return { error: err.message };
+      await fetchAll();
+      return { error: null };
+    },
+    [fetchAll]
+  );
+
   const addFood = useCallback(
     async (input: NewFoodInput) => {
       const { error: err } = await supabase.from("food_entries").insert(input);
@@ -414,7 +444,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const value: DataContextValue = {
     weightEntries, foodEntries, exercises, templates, userWorkouts, sessions,
     xpEvents, achievements, userAchievements, loading, error, refresh: fetchAll,
-    addWeight, addFood, deleteFood, saveWorkout, deleteWorkout, logSession,
+    addWeight, updateWeight, deleteWeight, addFood, deleteFood, saveWorkout, deleteWorkout, logSession,
     today, todayEntries, latestWeight, weightTrendKg, weekWorkoutCount,
     last30Workouts, sessionOn, hasLoggedToday, workoutDoneToday, mealCounts,
   };

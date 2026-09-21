@@ -3,7 +3,7 @@ import {
   CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
   Bar, BarChart,
 } from "recharts";
-import { TrendingDown, TrendingUp } from "lucide-react";
+import { Check, Pencil, Trash2, TrendingDown, TrendingUp, X } from "lucide-react";
 import { Card, Button, Input, Badge } from "../components/ui";
 import { useData } from "../context/DataContext";
 import { useProfile } from "../context/ProfileContext";
@@ -14,13 +14,19 @@ function fmtDate(d: string) {
 }
 
 export default function Progress() {
-  const { weightEntries, addWeight, sessions, sessionOn, weightTrendKg } = useData();
+  const { weightEntries, addWeight, updateWeight, deleteWeight, sessions, sessionOn, weightTrendKg } = useData();
   const { profile } = useProfile();
   const [weight, setWeight] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  /* inline edit state for the history list */
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editKg, setEditKg] = useState("");
+  const [editNote, setEditNote] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
 
   const today = todayKey();
   const existingToday = weightEntries.find((w) => w.entry_date === today);
@@ -172,6 +178,90 @@ export default function Progress() {
           </Card>
         </div>
       </div>
+
+      {/* Weigh-in history */}
+      <Card>
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">Weigh-in history</h2>
+          <span className="text-[13px] text-ink-muted">{weightEntries.length} entries</span>
+        </div>
+        {weightEntries.length === 0 ? (
+          <p className="mt-2 text-[13px] text-ink-faint">
+            No weigh-ins yet — log your first above and it will appear here.
+          </p>
+        ) : (
+          <ul className="mt-2 divide-y divide-line">
+            {weightEntries.slice(0, 30).map((w) => (
+              <li key={w.id} className="py-2.5">
+                {editingId === w.id ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input
+                      type="number" step="0.1" min="25" max="400"
+                      value={editKg}
+                      onChange={(e) => setEditKg(e.target.value)}
+                      className="w-24"
+                      aria-label="Weight in kilograms"
+                    />
+                    <Input
+                      value={editNote}
+                      onChange={(e) => setEditNote(e.target.value)}
+                      placeholder="Note (optional)"
+                      className="min-w-40 flex-1"
+                    />
+                    <Button
+                      size="sm" loading={editBusy} disabled={editBusy}
+                      onClick={async () => {
+                        const kg = Number(editKg);
+                        if (!kg || kg < 25 || kg > 400) return setError("Weight must be 25–400 kg.");
+                        setEditBusy(true);
+                        const { error } = await updateWeight(w.id, kg, editNote.trim() || null);
+                        setEditBusy(false);
+                        if (error) setError(error);
+                        else setEditingId(null);
+                      }}
+                    >
+                      <Check className="h-4 w-4" /> Save
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>
+                      <X className="h-4 w-4" /> Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[14px] font-medium text-ink">
+                        {fmtDate(w.entry_date)}
+                        <span className="ml-2 tnum">{w.weight_kg} kg</span>
+                      </p>
+                      {w.note && <p className="truncate text-[12px] text-ink-faint">{w.note}</p>}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        onClick={() => { setEditingId(w.id); setEditKg(String(w.weight_kg)); setEditNote(w.note ?? ""); setError(null); }}
+                        className="cursor-pointer rounded-lg p-1.5 text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink"
+                        aria-label={`Edit weigh-in from ${fmtDate(w.entry_date)}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (window.confirm(`Delete the ${fmtDate(w.entry_date)} weigh-in (${w.weight_kg} kg)?`)) {
+                            await deleteWeight(w.id);
+                          }
+                        }}
+                        className="cursor-pointer rounded-lg p-1.5 text-ink-faint transition-colors hover:bg-surface-2 hover:text-danger"
+                        aria-label={`Delete weigh-in from ${fmtDate(w.entry_date)}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
       {/* Volume chart */}
       <Card>

@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkBreaks from "remark-breaks";
 import { MessageCircle, Send, Trash2 } from "lucide-react";
 import { Card, Button, Textarea } from "../components/ui";
+import { Markdown } from "../components/Markdown";
 import { useAuth } from "../context/AuthContext";
 import { askCoach } from "../lib/aiClient";
 import { useData } from "../context/DataContext";
@@ -21,26 +20,6 @@ const SUGGESTIONS = [
 
 export default function Coach() {
   return <CoachInner />;
-}
-
-/**
- * Assistant bubbles render markdown (bold, lists, line breaks).
- * react-markdown renders to React elements — raw HTML in model output
- * is never injected, so this is injection-safe by construction.
- */
-function Markdown({ text }: { text: string }) {
-  return (
-    <div className="space-y-2 [&_a]:underline [&_h1]:text-[15px] [&_h1]:font-semibold [&_h2]:text-[15px] [&_h2]:font-semibold [&_h3]:text-[15px] [&_h3]:font-semibold [&_li]:ml-4 [&_li]:list-disc [&_ol>li]:list-decimal [&_p]:leading-relaxed [&_strong]:font-semibold">
-      <ReactMarkdown
-        remarkPlugins={[remarkBreaks]}
-        components={{
-          a: (props) => <a {...props} target="_blank" rel="noopener noreferrer" />,
-        }}
-      >
-        {text}
-      </ReactMarkdown>
-    </div>
-  );
 }
 
 function CoachInner() {

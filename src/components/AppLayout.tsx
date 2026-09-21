@@ -123,13 +123,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </button>
           <div className="mt-3 flex items-center gap-2 text-[13px]">
             <Flame className="h-4 w-4 text-data-amber" />
-            <span className="font-semibold text-ink">{profile?.streak_count ?? 0}</span>
+            <span className="font-semibold text-ink tnum">{profile ? profile.streak_count : "—"}</span>
             <span className="text-ink-faint">day streak</span>
           </div>
           <div className="mt-2 flex items-center gap-2 text-[13px]">
             <Zap className="h-4 w-4 text-accent-300" />
-            <span className="font-semibold text-ink tnum">{formatNumber(profile?.xp ?? 0)}</span>
-            <span className="text-ink-faint">XP · {rank.current.name}</span>
+            <span className="font-semibold text-ink tnum">{profile ? formatNumber(profile.xp) : "—"}</span>
+            <span className="text-ink-faint">XP · {profile ? rank.current.name : "…"}</span>
           </div>
         </div>
       </aside>
@@ -140,11 +140,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <button className="flex cursor-pointer items-center gap-3 text-[13px]" onClick={() => navigate("/app/profile")}>
           <span className="flex items-center gap-1 font-semibold">
             <Flame className="h-4 w-4 text-data-amber" />
-            {profile?.streak_count ?? 0}
+            {profile ? profile.streak_count : "—"}
           </span>
           <span className="flex items-center gap-1 font-semibold tnum">
             <Zap className="h-4 w-4 text-accent-300" />
-            {formatNumber(profile?.xp ?? 0)}
+            {profile ? formatNumber(profile.xp) : "—"}
           </span>
           <Avatar
             avatarId={profile?.avatar_url}

@@ -1,6 +1,8 @@
-import { useMemo, useState } from "react";
-import { Plus, Trash2, Zap } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Sparkles, Trash2, Zap } from "lucide-react";
 import { Card, Button, Input, Select } from "../components/ui";
+import { Markdown } from "../components/Markdown";
+import { askCoach } from "../lib/aiClient";
 import { useData } from "../context/DataContext";
 import { useProfile } from "../context/ProfileContext";
 import { formatNumber, todayKey } from "../lib/utils";
@@ -44,6 +46,51 @@ export default function Nutrition() {
   const [form, setForm] = useState<FoodForm>(EMPTY);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  /* AI meal suggestions for the empty state */
+  const [ideas, setIdeas] = useState<string | null>(null);
+  const [ideasBusy, setIdeasBusy] = useState(false);
+  const [ideasError, setIdeasError] = useState<string | null>(null);
+
+  /* quick-add in-flight guard: key of the chip currently being logged */
+  const [quickBusy, setQuickBusy] = useState<string | null>(null);
+
+  async function loadIdeas() {
+    setIdeasBusy(true);
+    setIdeasError(null);
+    setIdeas(null);
+    try {
+      const { reply } = await askCoach(
+        [
+          {
+            role: "user",
+            content:
+              "Nothing is logged in my food diary today. Suggest 3 quick meal ideas for the rest of today that fit my remaining calories and protein. For each: name, rough calories and protein, one line why it fits. Keep it under 120 words.",
+          },
+        ],
+        {
+          name: profile?.display_name,
+          goal: profile?.primary_goal ?? undefined,
+          calorieTarget: profile?.calorie_target ?? undefined,
+          proteinTarget: profile?.protein_target ?? undefined,
+          todayCalories: today.calories,
+          todayProtein: today.protein,
+          dietaryPreferences: profile?.dietary_preferences ?? [],
+        }
+      );
+      setIdeas(reply);
+    } catch (err) {
+      setIdeasError(err instanceof Error ? err.message : "Could not load suggestions.");
+    } finally {
+      setIdeasBusy(false);
+    }
+  }
+
+  // Fresh suggestions whenever the diary is empty and none are loaded.
+  useEffect(() => {
+    if (todayEntries.length === 0 && !ideas && !ideasBusy && !ideasError) void loadIdeas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayEntries.length]);
 
   const set = <K extends keyof FoodForm>(k: K, v: FoodForm[K]) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -199,8 +246,11 @@ export default function Nutrition() {
           {QUICK_ADDS.map((q) => (
             <button
               key={q.name}
-              onClick={() =>
-                void addFood({
+              disabled={quickBusy !== null}
+              onClick={async () => {
+                if (quickBusy) return;
+                setQuickBusy(q.name);
+                await addFood({
                   entry_date: todayKey(),
                   meal_type: "snack",
                   name: q.name,
@@ -212,15 +262,46 @@ export default function Nutrition() {
                   fat_g: q.fat,
                   source: "quick",
                   ai_confidence: null,
-                })
-              }
-              className="cursor-pointer rounded-full border border-line bg-surface-2 px-3 py-1.5 text-[13px] text-ink transition-colors hover:border-accent hover:bg-accent-soft"
+                });
+                setQuickBusy(null);
+              }}
+              className="cursor-pointer rounded-full border border-line bg-surface-2 px-3 py-1.5 text-[13px] text-ink transition-colors hover:border-accent hover:bg-accent-soft disabled:cursor-wait disabled:opacity-60"
             >
               {q.name} <span className="text-ink-faint">· {q.calories} kcal</span>
             </button>
           ))}
         </div>
       </Card>
+
+      {/* Empty-day AI suggestions */}
+      {todayEntries.length === 0 && (
+        <Card>
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-accent-300" />
+            <h2 className="font-semibold">Need ideas for today?</h2>
+          </div>
+          {ideasBusy && (
+            <div className="mt-3 space-y-2">
+              <div className="skeleton h-4 w-3/4" />
+              <div className="skeleton h-4 w-2/3" />
+              <div className="skeleton h-4 w-1/2" />
+            </div>
+          )}
+          {ideasError && (
+            <div className="mt-3">
+              <p className="text-[13px] text-ink-muted">{ideasError}</p>
+              <Button variant="secondary" size="sm" className="mt-2" onClick={() => void loadIdeas()}>
+                Try again
+              </Button>
+            </div>
+          )}
+          {ideas && (
+            <div className="mt-2 text-[14px] text-ink-muted">
+              <Markdown text={ideas} />
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Meals */}
       <div className="space-y-3">
@@ -232,9 +313,8 @@ export default function Nutrition() {
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold">{m.label}</h2>
                 <span className="text-[13px] tnum text-ink-muted">{formatNumber(kcal)} kcal</span>
-              </div>
-              {entries.length === 0 ? (
-                <p className="mt-2 text-[13px] text-ink-faint">Nothing logged.</p>
+              </div>                  {entries.length === 0 ? (
+                <p className="mt-2 text-[13px] text-ink-faint">Nothing logged yet.</p>
               ) : (
                 <ul className="mt-2 divide-y divide-line">
                   {entries.map((e) => (

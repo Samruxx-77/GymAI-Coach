@@ -1,10 +1,13 @@
-import { useRef, useState } from "react";
-import { Camera, CheckCircle2, RefreshCw, TriangleAlert } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Camera, CheckCircle2, RefreshCw, ScanLine, TriangleAlert } from "lucide-react";
 import { Card, Button, Input, Badge, EmptyState } from "../components/ui";
 import { scanFood, fileToDownscaledBase64, type FoodScanResponse } from "../lib/aiClient";
 import { useData } from "../context/DataContext";
 import { formatNumber, todayKey } from "../lib/utils";
 import type { MealType } from "../lib/types";
+
+/** Time window (ms) in which logging an identical entry is blocked. */
+const DUPE_WINDOW_MS = 60_000;
 
 export default function Scan() {
   const { addFood, today } = useData();
@@ -12,22 +15,39 @@ export default function Scan() {
   const cameraRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [logBusy, setLogBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<FoodScanResponse | null>(null);
   const [mealType, setMealType] = useState<MealType>("lunch");
+  const [logged, setLogged] = useState(false);
   const [edit, setEdit] = useState({ name: "", calories: "", protein: "", carbs: "", fat: "" });
+
+  /** Last logged signature for the short-window duplicate guard. */
+  const lastLogged = useRef<{ sig: string; at: number } | null>(null);
+
+  // Analyze phase progress messages (real states, not a fake timer).
+  const [phase, setPhase] = useState(0);
+  useEffect(() => {
+    if (!busy) {
+      setPhase(0);
+      return;
+    }
+    const id = setInterval(() => setPhase((p) => (p + 1) % PHASES.length), 4500);
+    return () => clearInterval(id);
+  }, [busy]);
 
   function pick(file: File | undefined | null) {
     if (!file) return;
     setError(null);
     setResult(null);
+    setLogged(false);
     const reader = new FileReader();
     reader.onload = () => setPreview(reader.result as string);
     reader.readAsDataURL(file);
   }
 
   async function analyze() {
-    if (!preview) return;
+    if (!preview || busy) return; // in-flight guard: no double analyze
     setBusy(true);
     setError(null);
     try {
@@ -36,6 +56,7 @@ export default function Scan() {
       const base64 = await fileToDownscaledBase64(input);
       const data = await scanFood(base64);
       setResult(data);
+      setLogged(false);
       setEdit({
         name: data.name,
         calories: String(data.calories),
@@ -50,24 +71,45 @@ export default function Scan() {
     }
   }
 
+  function signature(name: string, calories: number, protein: number) {
+    return `${name.trim().toLowerCase()}|${calories}|${protein}`;
+  }
+
   async function log() {
-    if (!result) return;
+    if (!result || logBusy) return; // in-flight guard: no double log
+    const name = edit.name || result.name;
+    const calories = Math.round(Number(edit.calories) || 0);
+    const protein = Math.round(Number(edit.protein) || 0);
+
+    // Short-window duplicate guard: identical entry just logged → confirm.
+    const sig = signature(name, calories, protein);
+    const recent = lastLogged.current;
+    if (recent && recent.sig === sig && Date.now() - recent.at < DUPE_WINDOW_MS) {
+      const ok = window.confirm(
+        `"${name}" (${formatNumber(calories)} kcal) was just logged. Add it again anyway?`
+      );
+      if (!ok) return;
+    }
+
+    setLogBusy(true);
+    setError(null);
     const { error } = await addFood({
       entry_date: todayKey(),
       meal_type: mealType,
-      name: edit.name || result.name,
+      name,
       servings: 1,
       serving_label: result.servingEstimate,
-      calories: Math.round(Number(edit.calories) || 0),
-      protein_g: Math.round(Number(edit.protein) || 0),
+      calories,
+      protein_g: protein,
       carbs_g: Math.round(Number(edit.carbs) || 0),
       fat_g: Math.round(Number(edit.fat) || 0),
       source: "ai_scan",
       ai_confidence: result.confidence,
     });
+    setLogBusy(false);
     if (!error) {
-      setResult(null);
-      setPreview(null);
+      lastLogged.current = { sig, at: Date.now() };
+      setLogged(true);
       if (fileRef.current) fileRef.current.value = "";
       if (cameraRef.current) cameraRef.current.value = "";
     } else {
@@ -104,11 +146,11 @@ export default function Scan() {
             <div>
               <img src={preview} alt="Meal preview" className="aspect-square w-full rounded-xl object-cover" />
               <div className="mt-3 flex gap-2">
-                <Button variant="secondary" size="sm" onClick={() => { setPreview(null); setResult(null); }}>
+                <Button variant="secondary" size="sm" onClick={() => { setPreview(null); setResult(null); setLogged(false); }}>
                   <RefreshCw className="h-3.5 w-3.5" /> Retake
                 </Button>
                 {!result && (
-                  <Button size="sm" loading={busy} onClick={analyze}>Analyze</Button>
+                  <Button size="sm" loading={busy} disabled={busy} onClick={analyze}>Analyze</Button>
                 )}
               </div>
             </div>
@@ -120,7 +162,19 @@ export default function Scan() {
                 </p>
               )}
 
-              {busy && <div className="skeleton h-48" />}
+              {busy && (
+                <div className="flex flex-col items-center gap-3 py-10 text-center">
+                  <span className="relative flex h-14 w-14 items-center justify-center">
+                    <span className="absolute inset-0 animate-ping rounded-2xl bg-accent-soft" />
+                    <ScanLine className="relative h-8 w-8 text-accent-300" />
+                  </span>
+                  <p className="text-[14px] font-medium text-ink">Analyzing your meal…</p>
+                  <p className="text-[13px] text-ink-muted">{PHASES[phase]}</p>
+                  <p className="max-w-[240px] text-[12px] text-ink-faint">
+                    Vision models on the free tier can take up to a minute. Keep this page open.
+                  </p>
+                </div>
+              )}
 
               {result && (
                 <div className="space-y-4">
@@ -168,7 +222,7 @@ export default function Scan() {
                     </div>
                   )}
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <select
                       value={mealType}
                       onChange={(e) => setMealType(e.target.value as MealType)}
@@ -179,7 +233,13 @@ export default function Scan() {
                       <option value="dinner">Dinner</option>
                       <option value="snack">Snack</option>
                     </select>
-                    <Button onClick={log}><CheckCircle2 className="h-4 w-4" /> Log to diary</Button>
+                    {logged ? (
+                      <Badge tone="success"><CheckCircle2 className="h-3.5 w-3.5" /> Logged — scan another or retake</Badge>
+                    ) : (
+                      <Button onClick={log} loading={logBusy} disabled={logBusy}>
+                        <CheckCircle2 className="h-4 w-4" /> Log to diary
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
@@ -220,3 +280,12 @@ export default function Scan() {
     </div>
   );
 }
+
+/** Rotating honesty about what the analyzer is doing. */
+const PHASES = [
+  "Uploading your photo…",
+  "Identifying the food…",
+  "Estimating portion size…",
+  "Calculating macros…",
+  "Still working — free-tier vision models are slow…",
+];

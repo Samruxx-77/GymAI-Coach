@@ -34,9 +34,9 @@ export interface CoachResponse {
   fallbackUsed: boolean;
 }
 
-async function postJson<T>(url: string, body: unknown): Promise<T> {
+async function postJson<T>(url: string, body: unknown, timeoutMs = 30_000): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30_000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -64,7 +64,9 @@ export function askCoach(messages: CoachMessage[], context: CoachContext): Promi
 }
 
 export function scanFood(imageBase64: string): Promise<FoodScanResponse> {
-  return postJson<FoodScanResponse>("/api/ai/food", { imageBase64 });
+  // Vision analysis is slow on free-tier models; allow 95s (just above
+  // the server's 90s food budget so server errors surface first).
+  return postJson<FoodScanResponse>("/api/ai/food", { imageBase64 }, 95_000);
 }
 
 export interface FoodScanResponse {
@@ -79,13 +81,13 @@ export interface FoodScanResponse {
   sanity: "ok" | "uncertain";
   provider: string;
   fallbackUsed: boolean;
-}
-
-/**
- * Downscale an image File to a JPEG (max 768px) and return base64
- * (no data: prefix) — small enough for a fast serverless round-trip.
+}/**
+ * Downscale an image File to a JPEG and return base64 (no data: prefix).
+ * Aggressive enough that phone photos upload fast (free-tier vision
+ * models choke on multi-megabyte payloads), still plenty for food ID.
+ * Escalates quality until the byte ceiling is met.
  */
-export function fileToDownscaledBase64(file: File, maxDim = 768): Promise<string> {
+export function fileToDownscaledBase64(file: File, maxDim = 640, maxBytes = 180_000): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
@@ -98,10 +100,20 @@ export function fileToDownscaledBase64(file: File, maxDim = 768): Promise<string
       canvas.width = w;
       canvas.height = h;
       const ctx = canvas.getContext("2d");
-      if (!ctx) return reject(new Error("Canvas not supported"));
+      if (!ctx) {
+        reject(new Error("Canvas not supported"));
+        return;
+      }
       ctx.drawImage(img, 0, 0, w, h);
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-      resolve(dataUrl.split(",")[1] ?? "");
+      for (const q of [0.85, 0.75, 0.6, 0.45]) {
+        const dataUrl = canvas.toDataURL("image/jpeg", q);
+        const b64 = dataUrl.split(",")[1] ?? "";
+        if (b64.length <= maxBytes || q === 0.45) {
+          resolve(b64);
+          return;
+        }
+      }
+      resolve("");
     };
     img.onerror = () => {
       URL.revokeObjectURL(objectUrl);
