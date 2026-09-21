@@ -23,7 +23,10 @@ export const AVATARS: AvatarDef[] = [
 ];
 
 export function avatarById(id: string | null | undefined): AvatarDef | null {
-  return AVATARS.find((a) => a.id === id) ?? null;
+  // Stored values are saved as `avatar:<id>` (see ProfileSettings.pickAvatar),
+  // while the picker passes bare ids — accept both so selected avatars resolve.
+  const key = id?.startsWith("avatar:") ? id.slice("avatar:".length) : id;
+  return AVATARS.find((a) => a.id === key) ?? null;
 }
 
 /** Dumbbell mark drawn in the lower-right of the avatar. */
