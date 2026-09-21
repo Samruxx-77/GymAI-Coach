@@ -6,6 +6,7 @@
  */
 import { readFileSync } from "node:fs";
 import { JSDOM } from "jsdom";
+import { build } from "esbuild";
 
 const bundle = process.argv[2] || "dist/assets/index-*.js";
 // Resolve the glob
@@ -15,7 +16,20 @@ if (!files.length) {
   console.error("No bundle found at", bundle);
   process.exit(1);
 }
-const code = readFileSync(files[0], "utf8");
+
+// Vite now emits ES-module chunks (lazy 3D scene), which window.eval cannot
+// parse. Convert the real production bundle to an IIFE first — same code,
+// executable form. Dynamic imports are inlined when splitting is off.
+const result = await build({
+  entryPoints: [files[0]],
+  bundle: true,
+  format: "iife",
+  platform: "browser",
+  target: "es2022",
+  write: false,
+  logLevel: "silent",
+});
+const code = result.outputFiles[0].text;
 
 const errors = [];
 const dom = new JSDOM(`<!doctype html><html><body><div id="root"></div></body></html>`, {
