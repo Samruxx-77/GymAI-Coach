@@ -9,6 +9,7 @@ import {
   Palette,
   Save,
   Target,
+  Trash2,
   Zap,
 } from "lucide-react";
 import { Card, Button, Input, Select, Badge } from "../components/ui";
@@ -18,6 +19,8 @@ import { useAuth } from "../context/AuthContext";
 import { useData } from "../context/DataContext";
 import { useTheme } from "../context/ThemeContext";
 import { calculateTargets, goalLabel } from "../lib/nutrition";
+import { deleteAccount } from "../lib/account";
+import { SUPPORT_EMAIL } from "../lib/contact";
 import { rankForXp } from "../lib/gamification";
 import { THEMES, THEME_IDS } from "../lib/themes";
 import { cn, formatNumber } from "../lib/utils";
@@ -47,6 +50,26 @@ export default function ProfileSettings() {
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ── Danger zone: delete account ──
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteTyped, setDeleteTyped] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDeleteAccount() {
+    if (deleteTyped.trim().toUpperCase() !== "DELETE") return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteAccount();
+      await signOut();
+      navigate("/", { replace: true });
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Could not delete the account.");
+      setDeleting(false);
+    }
+  }
 
   useEffect(() => {
     if (!profile) return;
@@ -413,6 +436,77 @@ export default function ProfileSettings() {
         >
           <LogOut className="h-4 w-4" /> Sign out
         </Button>
+      </Card>
+
+      {/* ── Danger zone ───────────────────────────────────────────── */}
+      <Card className="!border-danger/40">
+        <div className="flex items-center gap-2">
+          <Trash2 className="h-4 w-4 text-danger" />
+          <h2 className="font-semibold text-danger">Danger zone</h2>
+        </div>
+        <p className="mt-1 text-[13px] text-ink-muted">
+          Deleting your account permanently removes your profile, weigh-ins,
+          food logs, workouts, streaks, XP, achievements, and AI chat history.
+          This cannot be undone.
+        </p>
+
+        {!confirmingDelete ? (
+          <Button
+            variant="danger"
+            className="mt-4"
+            onClick={() => {
+              setConfirmingDelete(true);
+              setDeleteTyped("");
+              setDeleteError(null);
+            }}
+          >
+            <Trash2 className="h-4 w-4" /> Delete my account…
+          </Button>
+        ) : (
+          <div className="mt-4 rounded-xl border border-danger/30 bg-surface-2 p-4">
+            <p className="text-[13px] font-medium text-ink">
+              Type <span className="rounded bg-surface-3 px-1.5 py-0.5 font-mono text-danger">DELETE</span> to
+              confirm permanent deletion of your account and all data.
+            </p>
+            <Input
+              className="mt-3 max-w-xs"
+              placeholder="DELETE"
+              value={deleteTyped}
+              onChange={(e) => setDeleteTyped(e.target.value)}
+              disabled={deleting}
+              autoComplete="off"
+            />
+            {deleteError && <p className="mt-2 text-[13px] text-danger">{deleteError}</p>}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                variant="danger"
+                loading={deleting}
+                disabled={deleteTyped.trim().toUpperCase() !== "DELETE"}
+                onClick={handleDeleteAccount}
+              >
+                <Trash2 className="h-4 w-4" /> Yes, delete everything
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={deleting}
+                onClick={() => {
+                  setConfirmingDelete(false);
+                  setDeleteTyped("");
+                  setDeleteError(null);
+                }}
+              >
+                Keep my account
+              </Button>
+            </div>
+            {SUPPORT_EMAIL && (
+              <p className="mt-3 text-[12px] text-ink-faint">
+                Changed your mind about something? Email us at{" "}
+                <a className="text-accent-300 hover:underline" href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>{" "}
+                before deleting — we may be able to help.
+              </p>
+            )}
+          </div>
+        )}
       </Card>
     </div>
   );

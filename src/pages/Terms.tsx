@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Logo } from "../components/Logo";
+import { SUPPORT_EMAIL } from "../lib/contact";
 
 const sections: { h: string; p: string[] }[] = [
   {
@@ -61,7 +62,9 @@ const sections: { h: string; p: string[] }[] = [
   {
     h: "9. Contact",
     p: [
-      "Questions about these terms: use the contact details in the app's profile section.",
+      SUPPORT_EMAIL
+        ? `Questions about these terms: email us at ${SUPPORT_EMAIL}.`
+        : "Questions about these terms: use the contact details in the app's profile section.",
     ],
   },
 ];

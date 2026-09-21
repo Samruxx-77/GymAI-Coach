@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Logo } from "../components/Logo";
+import { SUPPORT_EMAIL } from "../lib/contact";
 
 const sections: { h: string; p: string[]; list?: string[] }[] = [
   {
@@ -18,6 +19,7 @@ const sections: { h: string; p: string[]; list?: string[] }[] = [
     p: [
       "Your data is used to run the app: showing your dashboard, progress charts, streaks, and personalizing AI coach replies with your own numbers.",
       "We do not sell your data. We do not share it with advertisers. We do not transfer it to data brokers.",
+      "The only third parties that ever process your data are the ones required to run the service: our database host (Supabase, section 4) and the AI providers that power the coach and food scanner (section 3).",
     ],
   },
   {
@@ -64,7 +66,9 @@ const sections: { h: string; p: string[]; list?: string[] }[] = [
   {
     h: "9. Contact",
     p: [
-      "Privacy questions or data requests: use the contact details in the app's profile section.",
+      SUPPORT_EMAIL
+        ? `Privacy questions or data requests: email us at ${SUPPORT_EMAIL}.`
+        : "Privacy questions or data requests: use the contact details in the app's profile section.",
     ],
   },
 ];
