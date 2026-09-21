@@ -35,14 +35,38 @@ export default function Progress() {
     if (existingToday) setWeight(String(existingToday.weight_kg));
   }, [existingToday?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const weightChart = useMemo(
-    () =>
-      [...weightEntries]
-        .sort((a, b) => a.entry_date.localeCompare(b.entry_date))
-        .slice(-60)
-        .map((w) => ({ date: fmtDate(w.entry_date), kg: w.weight_kg })),
-    [weightEntries]
-  );
+  // One point per day (latest entry wins) with guaranteed numeric kg —
+  // numeric columns can arrive as strings, which silently blank the chart.
+  // If every weigh-in shares a single day, plot each entry instead so the
+  // trend line appears from the 2nd weigh-in onward.
+  const weightChart = useMemo(() => {
+    const sorted = [...weightEntries]
+      .filter((w) => Number.isFinite(Number(w.weight_kg)) && Number(w.weight_kg) > 0)
+      .sort(
+        (a, b) => a.entry_date.localeCompare(b.entry_date) || a.created_at.localeCompare(b.created_at)
+      );
+    if (sorted.length === 0) return [];
+
+    const distinctDays = new Set(sorted.map((w) => w.entry_date));
+    const multiDay = distinctDays.size >= 2;
+
+    let rows: { date: string; kg: number; time: string }[];
+    if (multiDay) {
+      const byDay = new Map<string, { kg: number; time: string }>();
+      for (const w of sorted) byDay.set(w.entry_date, { kg: Number(w.weight_kg), time: w.created_at });
+      rows = [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, v]) => ({ date, ...v }));
+    } else {
+      rows = sorted.map((w) => ({ date: w.entry_date, kg: Number(w.weight_kg), time: w.created_at }));
+    }
+
+    return rows.slice(-60).map(({ date, kg, time }) => ({
+      date:
+        multiDay
+          ? fmtDate(date)
+          : `${fmtDate(date)} · ${new Date(time).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`,
+      kg,
+    }));
+  }, [weightEntries]);
 
   const volumeChart = useMemo(() => {
     // last 8 weeks ISO-ish buckets
@@ -55,7 +79,7 @@ export default function Progress() {
       const inWeek = sessions.filter((s) => s.session_date >= startK && s.session_date <= endK);
       weeks.push({
         label: fmtDate(endK),
-        volume: Math.round(inWeek.reduce((a, s) => a + s.total_volume_kg, 0)),
+        volume: Math.round(inWeek.reduce((a, s) => a + Number(s.total_volume_kg), 0)),
         sessions: inWeek.length,
       });
     }
@@ -109,7 +133,7 @@ export default function Progress() {
               </Badge>
             )}
           </div>
-          {weightChart.length >= 2 ? (
+          {weightEntries.length >= 2 && weightChart.length >= 1 ? (
             <div className="mt-4 h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={weightChart} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
@@ -121,12 +145,14 @@ export default function Progress() {
                     labelStyle={{ color: "var(--color-ink-muted)" }}
                     itemStyle={{ color: "var(--color-accent-300)" }}
                   />
-                  <Line type="monotone" dataKey="kg" stroke="var(--color-accent)" strokeWidth={2} dot={{ r: 2.5, fill: "var(--color-accent)" }} />
+                  <Line type="monotone" dataKey="kg" stroke="var(--color-accent)" strokeWidth={2} isAnimationActive={false} dot={{ r: 2.5, fill: "var(--color-accent)" }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <p className="mt-4 text-[13px] text-ink-faint">Log at least two weigh-ins to see your trend line.</p>
+            <p className="mt-4 text-[13px] text-ink-faint">
+              Log at least two weigh-ins to see your trend line.
+            </p>
           )}
 
           {/* weigh-in form */}
@@ -281,7 +307,7 @@ export default function Progress() {
                   labelStyle={{ color: "var(--color-ink-muted)" }}
                   itemStyle={{ color: "var(--color-accent-300)" }}
                 />
-                <Bar dataKey="volume" fill="var(--color-accent)" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="volume" fill="var(--color-accent)" isAnimationActive={false} radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

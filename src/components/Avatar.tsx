@@ -52,22 +52,25 @@ export function Avatar({ avatarId, name, className, showMark = true }: AvatarPro
   const initial = (name ?? "").trim().charAt(0).toUpperCase() || "G";
 
   if (!def) {
+    // No variant chosen: solid initials chip sized by the parent via `em`.
     return (
       <div
         className={cn(
-          "flex items-center justify-center rounded-2xl bg-accent-soft text-accent-300",
+          "flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-accent-soft text-accent-300",
           className
         )}
         aria-hidden
       >
-        <span className="display text-[0.55em] font-bold">{initial}</span>
+        <span className="display font-bold" style={{ fontSize: "0.55em" }}>
+          {initial}
+        </span>
       </div>
     );
   }
 
   return (
-    <div className={cn("relative overflow-hidden rounded-2xl", className)} aria-hidden>
-      <svg viewBox="0 0 192 192" className="h-full w-full">
+    <div className={cn("relative shrink-0 overflow-hidden rounded-xl", className)} aria-hidden>
+      <svg viewBox="0 0 192 192" className="block h-full w-full" preserveAspectRatio="xMidYMid slice">
         <defs>
           <radialGradient id={`bg-${uid}`} cx=".3" cy=".2" r=".9">
             <stop offset="0" stopColor={def.bg[0]} />
@@ -82,7 +85,7 @@ export function Avatar({ avatarId, name, className, showMark = true }: AvatarPro
         <rect width="192" height="192" fill={`url(#glow-${uid})`} />
         {showMark && MARK}
       </svg>
-      <span className="display absolute inset-0 flex items-center justify-center text-[0.6em] font-bold text-white/90 drop-shadow-[0_2px_8px_rgba(0,0,0,0.45)]">
+      <span className="display absolute inset-0 flex items-center justify-center font-bold text-white/90 drop-shadow-[0_2px_8px_rgba(0,0,0,0.45)]" style={{ fontSize: "0.6em" }}>
         {initial}
       </span>
     </div>

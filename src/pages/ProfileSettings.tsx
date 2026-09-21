@@ -156,17 +156,22 @@ export default function ProfileSettings() {
             }}
           />
         </div>
-        <div className="-mt-12 flex flex-wrap items-end justify-between gap-4 px-5 pb-5 sm:px-6">
-          <div className="flex items-end gap-4">
-            <div className="rounded-3xl bg-surface-1 p-1.5 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.7)] ring-1 ring-line">
-              <Avatar avatarId={profile.avatar_url} name={profile.display_name} className="h-20 w-20 text-3xl sm:h-24 sm:w-24" />
+        <div className="px-5 pb-5 sm:px-6">
+          {/* identity row: only the avatar chip overlaps the banner */}
+          <div className="-mt-10 flex items-end gap-3.5 sm:-mt-12 sm:gap-4">
+            <div className="shrink-0 rounded-[18px] bg-surface-1 p-1.5 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.7)] ring-1 ring-line">
+              <Avatar
+                avatarId={profile.avatar_url}
+                name={profile.display_name}
+                className="h-20 w-20 rounded-xl text-3xl sm:h-24 sm:w-24"
+              />
             </div>
-            <div className="pb-1">
-              <h1 className="display text-xl font-bold sm:text-2xl">{profile.display_name}</h1>
-              <p className="text-[13px] text-ink-muted">{user?.email}</p>
+            <div className="min-w-0 flex-1 pb-1">
+              <h1 className="display truncate text-xl font-bold sm:text-2xl">{profile.display_name}</h1>
+              <p className="truncate text-[13px] text-ink-muted">{user?.email}</p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2 pb-1">
+          <div className="mt-3 flex flex-wrap gap-2">
             <Badge tone="accent">{rank.current.name} · {formatNumber(profile.xp)} XP</Badge>
             <Badge tone="warning">{profile.streak_count}-day streak</Badge>
             <Badge tone="success">{goalLabel(profile.primary_goal)}</Badge>
