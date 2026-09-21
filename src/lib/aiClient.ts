@@ -2,6 +2,7 @@
  * Typed client for the server-side AI routes (/api/ai/*).
  * Never touches provider keys — the server owns those.
  */
+import { supabase } from "./supabase";
 
 export interface CoachContext {
   name?: string;
@@ -38,9 +39,15 @@ async function postJson<T>(url: string, body: unknown, timeoutMs = 30_000): Prom
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    // The server verifies this token before spending AI quota.
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess.session?.access_token;
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify(body),
       signal: controller.signal,
     });

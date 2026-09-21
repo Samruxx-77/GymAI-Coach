@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Button, Input } from "../components/ui";
 import authArt from "../assets/auth-scene.svg";
@@ -25,6 +25,7 @@ function AuthForm({ mode, setMode }: { mode: Mode; setMode: (m: Mode) => void })
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [agreed, setAgreed] = useState(false);
 
   // Arriving from an email recovery link: Supabase detects the session in URL.
   useEffect(() => {
@@ -42,6 +43,11 @@ function AuthForm({ mode, setMode }: { mode: Mode; setMode: (m: Mode) => void })
         if (error) setError(error);
         else navigate(returnTo, { replace: true });
       } else if (mode === "signup") {
+        if (!agreed) {
+          setError("Please agree to the Terms of Service and Privacy Policy to create an account.");
+          setBusy(false);
+          return;
+        }
         const { error, needsEmailConfirm } = await signUp(email, password, displayName);
         if (error) setError(error);
         else if (needsEmailConfirm) setNotice("Check your inbox to confirm your email, then log in.");
@@ -102,6 +108,23 @@ function AuthForm({ mode, setMode }: { mode: Mode; setMode: (m: Mode) => void })
             <Input id="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••" autoComplete={mode === "login" ? "current-password" : "new-password"} />
           </div>
+        )}
+
+        {mode === "signup" && (
+          <label className="flex cursor-pointer items-start gap-2.5 text-[13px] leading-relaxed text-ink-muted">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-accent-300)]"
+            />
+            <span>
+              I agree to the{" "}
+              <Link to="/terms" target="_blank" rel="noreferrer" className="font-medium text-accent-300 hover:underline">Terms of Service</Link>
+              {" "}and{" "}
+              <Link to="/privacy" target="_blank" rel="noreferrer" className="font-medium text-accent-300 hover:underline">Privacy Policy</Link>.
+            </span>
+          </label>
         )}
 
         {error && <p className="rounded-xl bg-danger/10 px-3 py-2 text-[13px] text-danger">{error}</p>}

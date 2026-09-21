@@ -226,7 +226,11 @@ export default function Landing() {
       </section>
 
       <footer className="border-t border-line py-8 text-center text-[13px] text-ink-faint">
-        GymAI Coach — fitness companion for gym members. Not medical advice.
+        <p>GymAI Coach — fitness companion for gym members. Not medical advice.</p>
+        <p className="mt-2 space-x-4">
+          <Link to="/terms" className="hover:underline">Terms of Service</Link>
+          <Link to="/privacy" className="hover:underline">Privacy Policy</Link>
+        </p>
       </footer>
     </div>
   );

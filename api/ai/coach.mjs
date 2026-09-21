@@ -10,6 +10,7 @@
  */
 import { runCompletion } from "../_lib/ai-provider.mjs";
 import { validateCoachBody, errorResponse, json, readJsonBody } from "../_lib/validate.mjs";
+import { requireUser, rateLimit } from "../_lib/auth.mjs";
 
 function buildSystemPrompt(context) {
   const c = context || {};
@@ -56,6 +57,11 @@ function buildSystemPrompt(context) {
 
 export default async function handleCoach(req, res, body) {
   try {
+    // Costly AI call — only signed-in members may use it.
+    const user = await requireUser(req, res);
+    if (!user) return;
+    if (!rateLimit(res, `coach:${user.id}`, { limit: 30, windowMs: 60_000 })) return;
+
     body = await readJsonBody(req, body);
     const check = validateCoachBody(body);
     if (check.error) return json(res, 400, { error: check.error });

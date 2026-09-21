@@ -19,6 +19,8 @@ import Progress from "./pages/Progress";
 import Coach from "./pages/Coach";
 import Achievements from "./pages/Achievements";
 import ProfileSettings from "./pages/ProfileSettings";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
 
 /** Sends members without completed onboarding to the wizard (except inside it). */
@@ -63,6 +65,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<RedirectIfAuthed><Landing /></RedirectIfAuthed>} />
           <Route path="/auth" element={<RedirectIfAuthed><Auth /></RedirectIfAuthed>} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
           <Route
             path="/onboarding"
             element={
