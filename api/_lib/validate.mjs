@@ -91,7 +91,9 @@ export function extractJson(text) {
 export function errorResponse(res, err) {
   const status = err?.statusCode || err?.status || 500;
   const fallback = "Something went wrong. Please try again.";
-  const message = status >= 500 ? fallback : err?.message || fallback;
+  // Providers can attach a safe, user-facing explanation (e.g. free-tier
+  // busy) that survives the 5xx sanitizer below.
+  const message = err?.userMessage || (status >= 500 ? fallback : err?.message || fallback);
   if (status >= 500) console.error("[api]", err);
   json(res, status, { error: message });
 }
