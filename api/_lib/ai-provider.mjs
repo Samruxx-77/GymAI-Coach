@@ -8,10 +8,16 @@
  * Fallback:  Google Gemini (GEMINI_API_KEY), optional
  *
  * Env knobs (all optional):
- *   OPENROUTER_MODEL            primary text model (default deepseek/deepseek-v4-flash-0731:free)
+ *   OPENROUTER_MODEL            primary text model (default z-ai/glm-5.2:free)
  *   OPENROUTER_FALLBACK_MODELS  comma-separated list tried in order on errors/rate limits
  *   OPENROUTER_VISION_MODEL     model used for image scans (default inclusionai/ling-3.0-flash-vl:free)
  *   GEMINI_MODEL / GEMINI_VISION_MODEL / GEMINI_API_KEY
+ *
+ * Default model IDs are verified against the live OpenRouter catalogue
+ * (GET https://openrouter.ai/api/v1/models). Slugs get retired without
+ * warning — a dead default broke every AI feature at once (2026-09-21) —
+ * so callOpenRouter() tries each model in the chain in turn instead of
+ * trusting a single ID.
  *
  * Swapping providers = editing this file alone.
  */
@@ -34,10 +40,6 @@ function timeoutSignal(ms) {
   const ctrl = new AbortController();
   setTimeout(() => ctrl.abort(), ms);
   return ctrl.signal;
-}
-
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
 }
 
 async function fetchJson(url, options, timeoutMs) {
@@ -63,8 +65,8 @@ async function fetchJson(url, options, timeoutMs) {
 }
 
 // ── OpenRouter (OpenAI-compatible) ────────────────────────────────────────
-const OR_TEXT_MODEL = process.env.OPENROUTER_MODEL || "deepseek/deepseek-v4-flash-0731:free";
-const OR_FALLBACKS = (process.env.OPENROUTER_FALLBACK_MODELS || "nex-agi/nex-n2.5-mini:free,z-ai/glm-5.2:free")
+const OR_TEXT_MODEL = process.env.OPENROUTER_MODEL || "z-ai/glm-5.2:free";
+const OR_FALLBACKS = (process.env.OPENROUTER_FALLBACK_MODELS || "nex-agi/nex-n2.5-mini:free,qwen/qwen3.8-27b:free")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
@@ -72,38 +74,14 @@ const OR_VISION_MODEL =
   process.env.OPENROUTER_VISION_MODEL || "inclusionai/ling-3.0-flash-vl:free";
 
 function orModelChain({ imageBase64 }) {
-  const primary = imageBase64 ? OR_VISION_MODEL : OR_TEXT_MODEL;
-  const chain = [primary, ...OR_FALLBACKS.filter((m) => m !== primary)];
-  return chain.length > 1 ? chain : null; // null → plain `model` field
+  // Text fallbacks can't read images — vision requests get the vision
+  // model only; a failure falls through to Gemini in runCompletion().
+  if (imageBase64) return [OR_VISION_MODEL];
+  return [...new Set([OR_TEXT_MODEL, ...OR_FALLBACKS])];
 }
 
-async function orOnce(body, timeoutMs) {
+async function orOnce(model, { systemPrompt, messages, imageBase64, json }, timeoutMs) {
   const base = (process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1").replace(/\/$/, "");
-  return fetchJson(`${base}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      "HTTP-Referer": process.env.APP_PUBLIC_URL || "https://gymai-coach.vercel.app",
-      "X-Title": "GymAI Coach",
-    },
-    body: JSON.stringify(body),
-  }, timeoutMs);
-}
-
-/** Detect the image MIME type from base64 magic bytes (default: jpeg). */
-function sniffImageMime(b64) {
-  if (b64.startsWith("iVBOR")) return "image/png";
-  if (b64.startsWith("Qk")) return "image/bmp";
-  if (b64.startsWith("UklGR")) return "image/webp";
-  return "image/jpeg";
-}
-
-async function callOpenRouter({ systemPrompt, messages, imageBase64, json, timeoutMs }) {
-  if (!process.env.OPENROUTER_API_KEY) {
-    throw new ProviderError("OPENROUTER_API_KEY is not configured", { status: 501 });
-  }
-
   const content = imageBase64
     ? [
         { type: "text", text: systemPrompt },
@@ -113,10 +91,8 @@ async function callOpenRouter({ systemPrompt, messages, imageBase64, json, timeo
         },
       ]
     : null;
-
-  const modelChain = orModelChain({ imageBase64 });
   const body = {
-    ...(modelChain ? { models: modelChain } : { model: modelChain || OR_TEXT_MODEL }),
+    model,
     temperature: json ? 0.2 : 0.7,
     // Vision models on the free tier reason extensively before answering —
     // give image calls a larger budget so reasoning doesn't eat the reply.
@@ -129,23 +105,57 @@ async function callOpenRouter({ systemPrompt, messages, imageBase64, json, timeo
       ? [{ role: "user", content }]
       : [{ role: "system", content: systemPrompt }, ...messages],
   };
-
-  let data;
-  try {
-    data = await orOnce(body, timeoutMs);
-  } catch (err) {
-    // Free models share an upstream pool — a single brief retry absorbs most 429s.
-    if ((err?.status === 429 || err?.status === 408) && modelChain) {
-      await sleep(1200);
-      data = await orOnce(body, timeoutMs);
-    } else {
-      throw err;
-    }
-  }
-
+  const data = await fetchJson(`${base}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      "HTTP-Referer": process.env.APP_PUBLIC_URL || "https://gymai-coach.vercel.app",
+      "X-Title": "GymAI Coach",
+    },
+    body: JSON.stringify(body),
+  }, timeoutMs);
   const text = data?.choices?.[0]?.message?.content?.trim() || "";
   if (!text) throw new ProviderError("Empty response from OpenRouter", { status: 502 });
-  return { text, provider: `openrouter:${data?.model || "unknown"}` };
+  return { text, provider: `openrouter:${data?.model || model}` };
+}
+
+async function callOpenRouter({ systemPrompt, messages, imageBase64, json, timeoutMs }) {
+  if (!process.env.OPENROUTER_API_KEY) {
+    throw new ProviderError("OPENROUTER_API_KEY is not configured", { status: 501 });
+  }
+  // Try each model in turn with a plain `model` field. Relying on OpenRouter's
+  // `models` array meant one retired slug (unknown model ID → HTTP 400) failed
+  // the whole request instead of falling through — client-side iteration
+  // survives dead slugs. A 429 on one model just moves to the next, which
+  // usually sits in a different upstream pool.
+  const params = { systemPrompt, messages, imageBase64, json };
+  const errors = [];
+  for (const model of orModelChain({ imageBase64 })) {
+    try {
+      return await orOnce(model, params, timeoutMs);
+    } catch (err) {
+      // 401 = the API key itself is bad — no other model can succeed.
+      if (err?.status === 401) {
+        throw new ProviderError(
+          "OpenRouter API key is invalid or revoked — the app owner needs to update it.",
+          { status: 401 }
+        );
+      }
+      errors.push(`${model}: ${err?.message || err}`);
+    }
+  }
+  throw new ProviderError(`All OpenRouter models failed. ${errors.join(" | ")}`, {
+    status: 502,
+  });
+}
+
+/** Detect the image MIME type from base64 magic bytes (default: jpeg). */
+function sniffImageMime(b64) {
+  if (b64.startsWith("iVBOR")) return "image/png";
+  if (b64.startsWith("Qk")) return "image/bmp";
+  if (b64.startsWith("UklGR")) return "image/webp";
+  return "image/jpeg";
 }
 
 // ── Gemini (optional fallback) ────────────────────────────────────────────

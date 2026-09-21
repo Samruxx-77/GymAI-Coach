@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Award,
   CalendarDays,
@@ -507,6 +507,22 @@ export default function ProfileSettings() {
             )}
           </div>
         )}
+      </Card>
+
+      {/* ── Legal ─────────────────────────────────────────────────── */}
+      <Card>
+        <h2 className="font-semibold">Legal</h2>
+        <p className="mt-1 text-[13px] text-ink-muted">
+          How we handle your data, and the rules for using GymAI Coach.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link to="/privacy">
+            <Button variant="ghost">Privacy Policy</Button>
+          </Link>
+          <Link to="/terms">
+            <Button variant="ghost">Terms of Service</Button>
+          </Link>
+        </div>
       </Card>
     </div>
   );
