@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ProfileProvider } from "./context/ProfileContext";
@@ -5,22 +6,26 @@ import { DataProvider } from "./context/DataContext";
 import { RequireAuth, AuthGate, RedirectIfAuthed } from "./components/AuthGuard";
 import { AppLayout } from "./components/AppLayout";
 import { useProfile } from "./context/ProfileContext";
-import Landing from "./pages/Landing";
-import Auth from "./pages/Auth";
-import Onboarding from "./pages/Onboarding";
-import Dashboard from "./pages/Dashboard";
-import Nutrition from "./pages/Nutrition";
-import Workouts from "./pages/Workouts";
-import WorkoutBuilder from "./pages/WorkoutBuilder";
-import WorkoutSession from "./pages/WorkoutSession";
-import WorkoutHistory from "./pages/WorkoutHistory";
-import Progress from "./pages/Progress";
-import Coach from "./pages/Coach";
-import Achievements from "./pages/Achievements";
-import ProfileSettings from "./pages/ProfileSettings";
-import Terms from "./pages/Terms";
-import Privacy from "./pages/Privacy";
-import NotFound from "./pages/NotFound";
+
+/* Route-level code splitting: each page becomes its own chunk so the
+ * landing page (and every other route) no longer downloads the whole app
+ * — e.g. recharts/Progress only loads when /app/progress is visited. */
+const Landing = lazy(() => import("./pages/Landing"));
+const Auth = lazy(() => import("./pages/Auth"));
+const Onboarding = lazy(() => import("./pages/Onboarding"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Nutrition = lazy(() => import("./pages/Nutrition"));
+const Workouts = lazy(() => import("./pages/Workouts"));
+const WorkoutBuilder = lazy(() => import("./pages/WorkoutBuilder"));
+const WorkoutSession = lazy(() => import("./pages/WorkoutSession"));
+const WorkoutHistory = lazy(() => import("./pages/WorkoutHistory"));
+const Progress = lazy(() => import("./pages/Progress"));
+const Coach = lazy(() => import("./pages/Coach"));
+const Achievements = lazy(() => import("./pages/Achievements"));
+const ProfileSettings = lazy(() => import("./pages/ProfileSettings"));
+const Terms = lazy(() => import("./pages/Terms"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 /** Sends members without completed onboarding to the wizard (except inside it). */
 function OnboardingGuard({ children }: { children: React.ReactNode }) {
@@ -61,6 +66,8 @@ function OnboardingPage() {
 export default function App() {
   return (
     <AuthProvider>
+      {/* Chunk loading fallback while a lazy route page downloads. */}
+      <Suspense fallback={<AuthGate />}>
         <Routes>
           <Route path="/" element={<RedirectIfAuthed><Landing /></RedirectIfAuthed>} />
           <Route path="/auth" element={<RedirectIfAuthed><Auth /></RedirectIfAuthed>} />
@@ -86,6 +93,7 @@ export default function App() {
           <Route path="/app/profile" element={<AppPage><ProfileSettings /></AppPage>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
+      </Suspense>
       </AuthProvider>
   );
 }
