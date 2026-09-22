@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Plus, ScanLine, Trash2, Zap } from "lucide-react";
+import { ScanLine, Trash2, Zap } from "lucide-react";
 import { Card, Button, Input, Select } from "../components/ui";
 import { FoodScanner } from "../components/FoodScanner";
 import { useData } from "../context/DataContext";
@@ -175,6 +175,16 @@ export default function Nutrition() {
         ) : null}
       </Card>
 
+      {/* Manual entry */}
+      <div>
+        <Button variant="secondary" className="w-full" onClick={() => setOpen((o) => !o)}>
+          Add Your Food Manually
+        </Button>
+        <p className="mt-1.5 text-[12px] text-ink-faint">
+          Enter the food name, servings, calories and macros yourself to log it for today.
+        </p>
+      </div>
+
       {/* Add form */}
       {open && (
         <Card>
@@ -262,9 +272,6 @@ export default function Nutrition() {
             </button>
           ))}
         </div>
-        <Button variant="secondary" size="sm" className="mt-3" onClick={() => setOpen((o) => !o)}>
-          <Plus className="h-4 w-4" /> Add food manually
-        </Button>
       </Card>
 
       {/* Meals */}
