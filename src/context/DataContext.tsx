@@ -75,7 +75,7 @@ interface DataContextValue {
   todayEntries: FoodEntry[];
   latestWeight: number | null;
   weightTrendKg: number | null; // last 4 weeks delta
-  weekWorkoutCount: number; // sessions in last 7 days
+  weekWorkoutCount: number; // sessions in the current local calendar week (Mon–Sun)
   last30Workouts: number;
   sessionOn: (date: string) => boolean;
   hasLoggedToday: boolean;
@@ -358,7 +358,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const { error: liErr } = await supabase
           .from("workout_exercises")
           .insert(lineItems.map((li) => ({ ...li, workout_id: data.id })));
-        if (liErr) return { error: liErr.message, id: null };
+        if (liErr) {
+          // Don't leave an empty workout header behind — best-effort cleanup.
+          await supabase.from("workouts").delete().eq("id", data.id);
+          return { error: liErr.message, id: null };
+        }
       }
       await fetchAll();
       return { error: null, id: data.id as string };
@@ -459,12 +463,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [weightEntries]);
 
   const weekWorkoutCount = useMemo(() => {
-    // Rolling 7-day window in LOCAL time: today + the 6 days before it.
-    // (The old UTC-based cutoff could span 8 calendar dates in IST.)
-    const d = new Date();
-    d.setDate(d.getDate() - 6);
-    const cutoff = dayKey(d);
-    return sessions.filter((s) => s.session_date >= cutoff).length;
+    // True local calendar week (Monday–Sunday): counts sessions in the
+    // current calendar week, not a rolling window.
+    const now = new Date();
+    const day = (now.getDay() + 6) % 7; // 0 = Monday … 6 = Sunday
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - day);
+    const start = dayKey(monday);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const end = dayKey(sunday);
+    return sessions.filter((s) => s.session_date >= start && s.session_date <= end).length;
   }, [sessions]);
 
   const last30Workouts = useMemo(() => {

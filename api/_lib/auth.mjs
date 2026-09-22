@@ -52,6 +52,40 @@ export async function requireUser(req, res) {
   }
 }
 
+/**
+ * Verify the request's Supabase access token AND require it to be freshly
+ * minted (issued within `maxAgeSec` seconds). Destructive routes (account
+ * deletion) use this so a stolen or stale session token alone is not enough —
+ * the caller must have signed in (or re-authenticated) recently.
+ *
+ * The token was already validated via /auth/v1/user above, so decoding the
+ * payload for `iat` is safe (no signature check needed here).
+ * Returns the user object on success, or sends a 401 and returns null.
+ */
+export async function requireFreshUser(req, res, maxAgeSec = 600) {
+  const user = await requireUser(req, res);
+  if (!user) return null;
+  const header = req.headers?.authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+  let iat = 0;
+  try {
+    const payload = JSON.parse(
+      Buffer.from(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8")
+    );
+    iat = Number(payload?.iat) || 0;
+  } catch {
+    iat = 0;
+  }
+  const ageSec = Date.now() / 1000 - iat;
+  if (!iat || ageSec > maxAgeSec) {
+    json(res, 401, {
+      error: "For security, please sign in again to confirm this action.",
+      reauthRequired: true,
+    });
+    return null;
+  }
+  return user;
+}
 // ── Simple per-user token-bucket rate limiter ─────────────────────────────
 // In-memory per serverless instance: not a global counter, but it still
 // blunts per-instance abuse (spam scripts, runaway clients) at zero cost.

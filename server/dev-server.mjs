@@ -20,6 +20,7 @@ const ROUTES = [
   { method: "POST", pattern: /^\/api\/ai\/food\/?$/, handler: handleFood },
   { method: "POST", pattern: /^\/api\/account\/delete\/?$/, handler: handleAccountDelete },
   { method: "GET", pattern: /^\/api\/health\/?$/, handler: handleHealth },
+  { method: "HEAD", pattern: /^\/api\/health\/?$/, handler: handleHealth },
 ];
 
 function readBody(req) {

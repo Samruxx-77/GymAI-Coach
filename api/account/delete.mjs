@@ -12,7 +12,7 @@
  * Requires SUPABASE_SERVICE_ROLE_KEY in the server environment
  * (Vercel → Project Settings → Environment Variables).
  */
-import { requireUser, rateLimit } from "../_lib/auth.mjs";
+import { requireFreshUser, rateLimit } from "../_lib/auth.mjs";
 import { json, readJsonBody, logRequest } from "../_lib/validate.mjs";
 
 export default async function handler(req, res) {
@@ -25,7 +25,11 @@ export default async function handler(req, res) {
     return json(res, 405, { error: "Method not allowed." });
   }
 
-  const user = await requireUser(req, res);
+  // Destructive + irreversible: require a FRESH session (signed in within the
+  // last 10 minutes). The client re-authenticates with the password right
+  // before calling, which mints a fresh token — a stale or stolen token alone
+  // is rejected with reauthRequired: true.
+  const user = await requireFreshUser(req, res, 10 * 60);
   if (!user) {
     status = 401;
     return;

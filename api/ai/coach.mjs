@@ -1,7 +1,9 @@
 /**
  * POST /api/ai/coach
  *
- * Body: { messages: [{ role: 'user' | 'assistant', content: string }], context?: {...} }
+ * Body: { messages: [{ role: 'user', content: string }], context?: {...} }
+ *   (only the 'user' role is accepted — client-supplied assistant history
+ *   is rejected to block prompt-injection via forged roles)
  * Returns: { reply, provider, fallbackUsed }
  *
  * The system prompt is built from the member's real profile data supplied
@@ -163,23 +165,45 @@ export default async function handleCoach(req, res, body) {
     const quota = await checkDailyQuota({ userId: user.id, token, endpoint: "coach" });
     if (!quota.allowed) {
       status = 429;
+      const retryAfter = Math.max(
+        1,
+        Math.ceil((new Date(new Date().toISOString().slice(0, 10) + "T23:59:59.999Z").getTime() - Date.now()) / 1000)
+      );
+      try {
+        res.setHeader("Retry-After", String(retryAfter));
+      } catch {
+        /* header already sent — ignore */
+      }
       return json(res, 429, {
-        error: `You've used your ${quota.limit} free AI chats for today. Try again tomorrow.`,
+        error: `You've used your ${quota.limit} free AI requests for today. Try again tomorrow.`,
       });
     }
 
     const { messages, context } = body;
     const systemPrompt = buildSystemPrompt(sanitizeCoachContext(context));
 
-    const result = await runCompletion({
-      systemPrompt,
-      messages: messages.map((m) => ({ role: "user", content: m.content.trim() })),
-    });
+    let providerCalls = 0;
+    let result;
+    try {
+      result = await runCompletion({
+        systemPrompt,
+        messages: messages.map((m) => ({ role: "user", content: m.content.trim() })),
+      });
+      providerCalls = result.providerCalls;
+    } catch (completionErr) {
+      // Even failed provider calls burn the shared free-tier budget — ledger
+      // them so the quota reflects real spend, not just successful replies.
+      providerCalls = Number(completionErr?.providerCalls) || 0;
+      if (providerCalls > 0) {
+        await recordUsage({ userId: user.id, token, endpoint: "coach", providerCalls }).catch(() => {});
+      }
+      throw completionErr;
+    }
     await recordUsage({
       userId: user.id,
       token,
       endpoint: "coach",
-      providerCalls: result.providerCalls,
+      providerCalls,
     });
 
     status = 200;

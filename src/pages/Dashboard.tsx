@@ -135,7 +135,7 @@ export default function Dashboard() {
             <span className="text-[13px] tnum text-ink-muted">{weightProgress}%</span>
           </div>
           <div className="mt-4">
-            <ProgressBar value={weightProgress} />
+            <ProgressBar value={weightProgress} label="Weight goal progress" />
             <div className="mt-2 flex justify-between text-[13px] text-ink-muted">
               <span>Start {formatNumber(profile.start_weight_kg ?? 0, 1)} kg</span>
               <span>Target {formatNumber(profile.target_weight_kg ?? 0, 1)} kg</span>
@@ -175,7 +175,11 @@ export default function Dashboard() {
             </Link>
           </div>
           <div className="mt-4">
-            <ProgressBar value={(weekWorkoutCount / profile.weekly_workout_target) * 100} tone="success" />
+            <ProgressBar
+              value={(weekWorkoutCount / profile.weekly_workout_target) * 100}
+              tone="success"
+              label="Workouts this week"
+            />
           </div>
         </Card>
       </div>
@@ -238,7 +242,7 @@ function NutritionCard({
         {formatNumber(value)}
         <span className="text-sm font-medium text-ink-muted"> / {formatNumber(target)} {unit}</span>
       </p>
-      <ProgressBar className="mt-3" value={pct} tone={over ? "warning" : "accent"} />
+      <ProgressBar className="mt-3" value={pct} tone={over ? "warning" : "accent"} label={label} />
       <Link to="/app/nutrition" className="mt-3 inline-flex items-center gap-1 text-[13px] font-medium text-accent-300 hover:underline">
         Log food <ArrowRight className="h-3.5 w-3.5" />
       </Link>

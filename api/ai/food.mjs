@@ -123,17 +123,37 @@ export default async function handleFood(req, res, body) {
     const quota = await checkDailyQuota({ userId: user.id, token, endpoint: "food" });
     if (!quota.allowed) {
       status = 429;
+      const retryAfter = Math.max(
+        1,
+        Math.ceil((new Date(new Date().toISOString().slice(0, 10) + "T23:59:59.999Z").getTime() - Date.now()) / 1000)
+      );
+      try {
+        res.setHeader("Retry-After", String(retryAfter));
+      } catch {
+        /* header already sent — ignore */
+      }
       return json(res, 429, {
         error: `You've used your ${quota.limit} free food scans for today. Try again tomorrow.`,
       });
     }
 
-    const result = await runCompletion({
-      systemPrompt: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: "Estimate the nutrition of this food." }],
-      imageBase64: body.imageBase64,
-      json: true,
-    });
+    let result;
+    try {
+      result = await runCompletion({
+        systemPrompt: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: "Estimate the nutrition of this food." }],
+        imageBase64: body.imageBase64,
+        json: true,
+      });
+    } catch (completionErr) {
+      // Failed vision calls still burn the shared free-tier budget — ledger
+      // them so the quota reflects real spend.
+      const failedCalls = Number(completionErr?.providerCalls) || 0;
+      if (failedCalls > 0) {
+        await recordUsage({ userId: user.id, token, endpoint: "food", providerCalls: failedCalls }).catch(() => {});
+      }
+      throw completionErr;
+    }
     await recordUsage({
       userId: user.id,
       token,

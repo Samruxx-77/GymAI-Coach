@@ -164,12 +164,12 @@ export default function Progress() {
           {/* weigh-in form */}
           <form onSubmit={submit} className="mt-4 flex flex-wrap items-end gap-2 border-t border-line pt-4">
             <div className="w-32">
-              <label className="mb-1.5 block text-[12px] font-medium text-ink-muted">Today's weight (kg)</label>
-              <Input type="number" step="0.1" min="25" max="400" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="80.5" />
+              <label htmlFor="weigh-in-kg" className="mb-1.5 block text-[12px] font-medium text-ink-muted">Today's weight (kg)</label>
+              <Input id="weigh-in-kg" type="number" step="0.1" min="25" max="400" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="80.5" />
             </div>
             <div className="min-w-40 flex-1">
-              <label className="mb-1.5 block text-[12px] font-medium text-ink-muted">Note (optional)</label>
-              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Morning, fasted…" />
+              <label htmlFor="weigh-in-note" className="mb-1.5 block text-[12px] font-medium text-ink-muted">Note (optional)</label>
+              <Input id="weigh-in-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Morning, fasted…" />
             </div>
             <Button type="submit" loading={busy}>{existingToday ? "Update" : "Log weight"}</Button>
           </form>

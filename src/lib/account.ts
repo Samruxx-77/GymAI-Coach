@@ -40,6 +40,28 @@ export async function deleteAccount(password?: string): Promise<void> {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data?.ok) {
+      // Server rejected a stale token: try one silent refresh (works for
+      // OAuth/phone sessions too) and retry once before giving up.
+      if (data?.reauthRequired) {
+        const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+        const freshToken = refreshed.session?.access_token;
+        if (!refreshError && freshToken && freshToken !== token) {
+          const retry = await fetch("/api/account/delete", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${freshToken}`,
+            },
+            body: JSON.stringify({ confirm: "DELETE" }),
+            signal: controller.signal,
+          });
+          const retryData = await retry.json().catch(() => ({}));
+          if (retry.ok && retryData?.ok) return;
+          throw new Error(
+            retryData?.error || "For security, please sign out and sign in again, then retry."
+          );
+        }
+      }
       throw new Error(data?.error || `Account deletion failed (${res.status}).`);
     }
   } catch (err) {

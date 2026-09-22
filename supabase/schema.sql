@@ -10,14 +10,12 @@ create extension if not exists pgcrypto;
 
 -- ═══════════════════════════════════════════════════════════════════
 -- MIGRATIONS — repair older databases (all idempotent, safe to re-run)
+-- NOTE: the ALTER TABLE migrations that need existing tables live in the
+-- "POST-CREATION MIGRATIONS" section after the table definitions, so this
+-- file also runs cleanly on a FRESH database.
 -- ═══════════════════════════════════════════════════════════════════
 
--- Custom exercises (2026-09-22): older DBs lack public.exercises.user_id
--- and still carry the old global unique name constraint + unwritable RLS.
-alter table public.exercises
-  add column if not exists user_id uuid references auth.users(id) on delete cascade;
--- Drop the legacy global unique-name constraint if it survived (default PG name).
-alter table public.exercises drop constraint if exists exercises_name_key;
+-- (table-dependent migrations moved below table creation)
 
 -- Custom-exercise delete safety: deleting an exercise must not orphan
 -- workout_exercises rows (deleting a referenced exercise used to 500).
@@ -280,6 +278,30 @@ drop trigger if exists xp_verify_ref on public.xp_events;
 create trigger xp_verify_ref before insert on public.xp_events
   for each row execute function public.verify_xp_ref();
 
+-- profiles.xp integrity: the displayed total is recomputed from the ledger
+-- (xp_events points + unlocked achievement rewards) on every update, so a
+-- client can never PATCH an inflated total — the app's own recomputeXpCache
+-- writes the same value, so the trigger is a no-op for legitimate writes.
+create or replace function public.recompute_profile_xp()
+returns trigger language plpgsql as $$
+declare
+  ledger_total integer;
+  reward_total integer;
+begin
+  select coalesce(sum(points), 0) into ledger_total
+    from public.xp_events where user_id = new.id;
+  select coalesce(sum(a.xp_reward), 0) into reward_total
+    from public.user_achievements ua
+    join public.achievements a on a.id = ua.achievement_id
+    where ua.user_id = new.id;
+  new.xp := ledger_total + reward_total;
+  return new;
+end $$;
+
+drop trigger if exists profiles_recompute_xp on public.profiles;
+create trigger profiles_recompute_xp before update on public.profiles
+  for each row execute function public.recompute_profile_xp();
+
 -- ── 8b. AI USAGE (append-only ledger — persistent per-user daily AI quota)
 -- The server records one row per AI endpoint call (with the number of
 -- provider requests it spent). No UPDATE/DELETE policies: append-only.
@@ -336,6 +358,26 @@ create table if not exists public.ai_messages (
 );
 create index if not exists ai_messages_conversation on public.ai_messages (conversation_id, created_at);
 create index if not exists ai_conversations_user_updated on public.ai_conversations (user_id, updated_at desc);
+
+-- ═══════════════════════════════════════════════════════════════════
+-- POST-CREATION MIGRATIONS — repair older databases.
+-- These run AFTER the tables above exist, so the file also works on FRESH
+-- databases (ALTER TABLE on a missing table would abort the script).
+-- All statements are idempotent / guarded — safe to re-run.
+-- ═══════════════════════════════════════════════════════════════════
+
+-- Custom exercises (2026-09-22): older DBs lack public.exercises.user_id
+-- and still carry the old global unique name constraint.
+alter table public.exercises
+  add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table public.exercises drop constraint if exists exercises_name_key;
+
+-- GRANTs — PostgREST serves API requests as anon/authenticated; without
+-- these, a fresh database would be API-dead even with correct RLS.
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant select on all tables in schema public to anon;
+grant usage, select on all sequences in schema public to authenticated;
 
 -- ═══════════════════════════════════════════════════════════════════
 -- ROW LEVEL SECURITY — member data is isolated to auth.uid()
