@@ -10,7 +10,6 @@ import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import Nutrition from "./pages/Nutrition";
-import Scan from "./pages/Scan";
 import Workouts from "./pages/Workouts";
 import WorkoutBuilder from "./pages/WorkoutBuilder";
 import WorkoutSession from "./pages/WorkoutSession";
@@ -75,7 +74,7 @@ export default function App() {
           />
           <Route path="/app" element={<AppPage><Dashboard /></AppPage>} />
           <Route path="/app/nutrition" element={<AppPage><Nutrition /></AppPage>} />
-          <Route path="/app/scan" element={<AppPage><Scan /></AppPage>} />
+          <Route path="/app/scan" element={<Navigate to="/app/nutrition?mode=scan" replace />} />
           <Route path="/app/workouts" element={<AppPage><Workouts /></AppPage>} />
           <Route path="/app/workouts/new" element={<AppPage><WorkoutBuilder /></AppPage>} />
           <Route path="/app/workouts/history" element={<AppPage><WorkoutHistory /></AppPage>} />
