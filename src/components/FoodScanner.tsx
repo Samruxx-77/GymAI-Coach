@@ -13,6 +13,10 @@ export function FoodScanner() {
   const { addFood, today } = useData();
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
+  /** The exact file the user last picked — analyze() uses this instead of
+   * re-reading the two inputs, so a gallery photo can never leak into a
+   * camera analysis (or vice versa) when both inputs hold files. */
+  const pickedFile = useRef<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [logBusy, setLogBusy] = useState(false);
@@ -43,6 +47,11 @@ export function FoodScanner() {
     setDupeWarning(null);
     setResult(null);
     setLogged(false);
+    pickedFile.current = file;
+    // Clear both inputs: the File object is kept in pickedFile, so stale
+    // files can never be re-read by analyze().
+    if (fileRef.current) fileRef.current.value = "";
+    if (cameraRef.current) cameraRef.current.value = "";
     const reader = new FileReader();
     reader.onload = () => setPreview(reader.result as string);
     reader.readAsDataURL(file);
@@ -53,7 +62,7 @@ export function FoodScanner() {
     setBusy(true);
     setError(null);
     try {
-      const input = fileRef.current?.files?.[0] ?? cameraRef.current?.files?.[0];
+      const input = pickedFile.current;
       if (!input) throw new Error("Choose a photo first.");
       const base64 = await fileToDownscaledBase64(input);
       const data = await scanFood(base64);
@@ -111,6 +120,7 @@ export function FoodScanner() {
     if (!error) {
       lastLogged.current = { sig, at: Date.now() };
       setLogged(true);
+      pickedFile.current = null;
       if (fileRef.current) fileRef.current.value = "";
       if (cameraRef.current) cameraRef.current.value = "";
     } else {
@@ -142,7 +152,7 @@ export function FoodScanner() {
             <div>
               <img src={preview} alt="Meal preview" className="aspect-square w-full rounded-xl object-cover" />
               <div className="mt-3 flex gap-2">
-                <Button variant="secondary" size="sm" onClick={() => { setPreview(null); setResult(null); setLogged(false); }}>
+                <Button variant="secondary" size="sm" onClick={() => { setPreview(null); setResult(null); setLogged(false); pickedFile.current = null; }}>
                   <RefreshCw className="h-3.5 w-3.5" /> Retake
                 </Button>
                 {!result && (
