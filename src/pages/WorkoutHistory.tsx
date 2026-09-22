@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { CalendarClock, Dumbbell, Timer } from "lucide-react";
-import { Card, Badge, EmptyState, Button } from "../components/ui";
+import { Card, Badge, EmptyState, buttonClasses } from "../components/ui";
 import { useData } from "../context/DataContext";
 import { formatNumber } from "../lib/utils";
 
@@ -32,7 +32,7 @@ export default function WorkoutHistory() {
           <h1 className="display text-2xl font-bold">Workout history</h1>
           <p className="text-[13px] text-ink-muted">Every completed session with real logged sets.</p>
         </div>
-        <Link to="/app/workouts"><Button variant="secondary" size="sm">Back</Button></Link>
+        <Link to="/app/workouts" className={buttonClasses("secondary", "sm")}>Back</Link>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -53,7 +53,7 @@ export default function WorkoutHistory() {
           icon={<Dumbbell />}
           title="No workouts yet"
           description="Finish your first session and it will show up here."
-          action={<Link to="/app/workouts"><Button size="sm">Find a workout</Button></Link>}
+          action={<Link to="/app/workouts" className={buttonClasses("primary", "sm")}>Find a workout</Link>}
         />
       ) : (
         <div className="space-y-3">

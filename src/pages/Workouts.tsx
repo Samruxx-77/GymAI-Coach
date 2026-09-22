@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Clock, Dumbbell, History, Pencil, Play, Plus, Repeat, Trash2 } from "lucide-react";
-import { Card, Button, Badge, EmptyState } from "../components/ui";
+import { Card, Button, Badge, EmptyState, buttonClasses } from "../components/ui";
 import { useData } from "../context/DataContext";
 import { useProfile } from "../context/ProfileContext";
 import { cn } from "../lib/utils";
@@ -24,8 +24,8 @@ export default function Workouts() {
           <p className="text-[13px] text-ink-muted">Start a session, build your own, review history.</p>
         </div>
         <div className="flex gap-2">
-          <Link to="/app/workouts/history"><Button variant="secondary"><History className="h-4 w-4" /> History</Button></Link>
-          <Link to="/app/workouts/new"><Button><Plus className="h-4 w-4" /> Add Exercises</Button></Link>
+          <Link to="/app/workouts/history" className={buttonClasses("secondary", "md")}><History className="h-4 w-4" /> History</Link>
+          <Link to="/app/workouts/new" className={buttonClasses("primary", "md")}><Plus className="h-4 w-4" /> Add Exercises</Link>
         </div>
       </div>
 
@@ -141,7 +141,7 @@ export default function Workouts() {
           icon={<Plus />}
           title="No custom workouts yet"
           description="Build a workout from the exercise library and reuse it any day."
-          action={<Link to="/app/workouts/new"><Button size="sm">Build your first</Button></Link>}
+          action={<Link to="/app/workouts/new" className={buttonClasses("primary", "sm")}>Build your first</Link>}
         />
       )}
     </div>

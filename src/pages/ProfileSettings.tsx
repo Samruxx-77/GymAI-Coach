@@ -12,7 +12,7 @@ import {
   Trash2,
   Zap,
 } from "lucide-react";
-import { Card, Button, Input, Select, Badge } from "../components/ui";
+import { Card, Button, Input, Select, Badge, buttonClasses } from "../components/ui";
 import { Avatar, AVATARS } from "../components/Avatar";
 import { useProfile } from "../context/ProfileContext";
 import { useAuth } from "../context/AuthContext";
@@ -629,11 +629,11 @@ export default function ProfileSettings() {
           </p>
         )}
         <div className="mt-4 flex flex-wrap gap-2">
-          <Link to="/privacy">
-            <Button variant="ghost">Privacy Policy</Button>
+          <Link to="/privacy" className={buttonClasses("ghost", "md")}>
+            Privacy Policy
           </Link>
-          <Link to="/terms">
-            <Button variant="ghost">Terms of Service</Button>
+          <Link to="/terms" className={buttonClasses("ghost", "md")}>
+            Terms of Service
           </Link>
         </div>
       </Card>

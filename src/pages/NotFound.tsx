@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Button } from "../components/ui";
+import { buttonClasses } from "../components/ui";
 import { Logo } from "../components/Logo";
 
 export default function NotFound() {
@@ -10,8 +10,8 @@ export default function NotFound() {
         <p className="display text-6xl font-bold text-ink">404</p>
         <p className="mt-2 text-ink-muted">This page skipped leg day and disappeared.</p>
       </div>
-      <Link to="/">
-        <Button>Back to home</Button>
+      <Link to="/" className={buttonClasses()}>
+        Back to home
       </Link>
     </div>
   );

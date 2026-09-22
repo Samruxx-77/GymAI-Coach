@@ -198,47 +198,47 @@ export default function Nutrition() {
           <form onSubmit={submit} className="mt-4 space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="sm:col-span-2">
-                <label className="mb-1.5 block text-[13px] font-medium text-ink-muted">Food</label>
-                <Input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Chicken & rice bowl" />
+                <label htmlFor="food-name" className="mb-1.5 block text-[13px] font-medium text-ink-muted">Food</label>
+                <Input id="food-name" value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Chicken & rice bowl" />
               </div>
               <div>
-                <label className="mb-1.5 block text-[13px] font-medium text-ink-muted">Meal</label>
-                <Select value={form.meal_type} onChange={(e) => set("meal_type", e.target.value as MealType)}>
+                <label htmlFor="food-meal" className="mb-1.5 block text-[13px] font-medium text-ink-muted">Meal</label>
+                <Select id="food-meal" value={form.meal_type} onChange={(e) => set("meal_type", e.target.value as MealType)}>
                   {MEALS.map((m) => <option key={m.type} value={m.type}>{m.label}</option>)}
                 </Select>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-[13px] font-medium text-ink-muted">Servings</label>
-                  <Input type="number" min="0.1" step="0.1" value={form.servings} onChange={(e) => set("servings", e.target.value)} />
+                  <label htmlFor="food-servings" className="mb-1.5 block text-[13px] font-medium text-ink-muted">Servings</label>
+                  <Input id="food-servings" type="number" min="0.1" step="0.1" value={form.servings} onChange={(e) => set("servings", e.target.value)} />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-[13px] font-medium text-ink-muted">Serving label</label>
-                  <Input value={form.serving_label} onChange={(e) => set("serving_label", e.target.value)} placeholder="bowl" />
+                  <label htmlFor="food-serving-label" className="mb-1.5 block text-[13px] font-medium text-ink-muted">Serving label</label>
+                  <Input id="food-serving-label" value={form.serving_label} onChange={(e) => set("serving_label", e.target.value)} placeholder="bowl" />
                 </div>
               </div>
               <div>
-                <label className="mb-1.5 block text-[13px] font-medium text-ink-muted">Calories (per serving)</label>
-                <Input type="number" min="0" value={form.calories} onChange={(e) => set("calories", e.target.value)} placeholder="520" />
+                <label htmlFor="food-calories" className="mb-1.5 block text-[13px] font-medium text-ink-muted">Calories (per serving)</label>
+                <Input id="food-calories" type="number" min="0" value={form.calories} onChange={(e) => set("calories", e.target.value)} placeholder="520" />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-[13px] font-medium text-ink-muted">Protein g</label>
-                  <Input type="number" min="0" value={form.protein} onChange={(e) => set("protein", e.target.value)} />
+                  <label htmlFor="food-protein" className="mb-1.5 block text-[13px] font-medium text-ink-muted">Protein g</label>
+                  <Input id="food-protein" type="number" min="0" value={form.protein} onChange={(e) => set("protein", e.target.value)} />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-[13px] font-medium text-ink-muted">Carbs g</label>
-                  <Input type="number" min="0" value={form.carbs} onChange={(e) => set("carbs", e.target.value)} />
+                  <label htmlFor="food-carbs" className="mb-1.5 block text-[13px] font-medium text-ink-muted">Carbs g</label>
+                  <Input id="food-carbs" type="number" min="0" value={form.carbs} onChange={(e) => set("carbs", e.target.value)} />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-[13px] font-medium text-ink-muted">Fat g</label>
-                  <Input type="number" min="0" value={form.fat} onChange={(e) => set("fat", e.target.value)} />
+                  <label htmlFor="food-fat" className="mb-1.5 block text-[13px] font-medium text-ink-muted">Fat g</label>
+                  <Input id="food-fat" type="number" min="0" value={form.fat} onChange={(e) => set("fat", e.target.value)} />
                 </div>
               </div>
             </div>
             {error && <p className="text-[13px] text-danger">{error}</p>}
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button type="button" variant="ghost" onClick={() => { setForm(EMPTY); setOpen(false); }}>Cancel</Button>
               <Button type="submit" loading={busy}>Add to diary</Button>
             </div>
           </form>

@@ -33,7 +33,9 @@ function readBody(req) {
       // base64; a 1 MB body ceiling leaves room for JSON overhead while
       // keeping memory use bounded.
       if (size > 1024 * 1024) {
-        reject(new Error("Payload too large"));
+        const err = new Error("Request body too large.");
+        err.statusCode = 413;
+        reject(err);
         req.destroy();
         return;
       }

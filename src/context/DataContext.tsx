@@ -171,7 +171,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const [w, f, ex, wk, se, xp, ach, uach] = await Promise.all([
-        supabase.from("weight_entries").select("*").order("entry_date", { ascending: false }),
+        supabase.from("weight_entries").select("*").order("entry_date", { ascending: false }).limit(365),
         supabase.from("food_entries").select("*").order("entry_date", { ascending: false }).limit(400),
         supabase.from("exercises").select("*").order("name"),
         supabase.from("workouts").select("*, workout_exercises(*, exercises(*))").order("updated_at", { ascending: false }),
@@ -274,10 +274,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
         await updateProfile({ current_weight_kg: kg });
       }
       await awardXp("weight_log", null);
-      await fetchAll();
+      // awardXp already refreshed everything via fetchAll — no second refresh.
       return { error: null };
     },
-    [user, profile, updateProfile, awardXp, fetchAll]
+    [user, profile, updateProfile, awardXp]
   );
 
   const updateWeight = useCallback(
@@ -424,10 +424,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (!pErr && streak !== profile.streak_count) await awardXp("streak_day", null);
         await updateProfile({ last_active_date: today, streak_count: streak, best_streak: best });
       }
-      await fetchAll();
+      // No extra fetchAll here — awardXp("workout_complete") above already
+      // refreshed everything.
       return { error: null };
     },
-    [user, profile, awardXp, updateProfile, fetchAll]
+    [user, profile, awardXp, updateProfile]
   );
 
   /* ── computed ──────────────────────────────────────────────── */

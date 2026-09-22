@@ -131,9 +131,16 @@ export function extractJson(text) {
 export function errorResponse(res, err) {
   const status = err?.statusCode || err?.status || 500;
   const fallback = "Something went wrong. Please try again.";
-  // Providers can attach a safe, user-facing explanation (e.g. free-tier
-  // busy) that survives the 5xx sanitizer below.
-  const message = err?.userMessage || (status >= 500 ? fallback : err?.message || fallback);
+  // A provider may attach a safe, user-facing explanation (e.g. free-tier
+  // busy) — that one is written by us, so it passes the sanitizer through.
+  if (err?.userMessage) {
+    if (status >= 500) console.error("[api]", err);
+    json(res, status, { error: err.userMessage });
+    return;
+  }
+  // Raw provider text (4xx as well as 5xx) can contain provider-internal
+  // detail — it is logged server-side but never forwarded to clients.
   if (status >= 500) console.error("[api]", err);
-  json(res, status, { error: message });
+  else console.warn("[api] request failed:", err?.message || err);
+  json(res, status, { error: fallback });
 }

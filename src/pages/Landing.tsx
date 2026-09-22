@@ -12,7 +12,7 @@ import {
   Trophy,
   Zap,
 } from "lucide-react";
-import { Button } from "../components/ui";
+import { buttonClasses } from "../components/ui";
 import { Logo } from "../components/Logo";
 import { useAuth } from "../context/AuthContext";
 import { prefersReducedMotion } from "../lib/env";
@@ -79,8 +79,8 @@ export default function Landing() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3.5">
           <Logo />
           <div className="flex items-center gap-2">
-            <Link to={primary.to}><Button variant="ghost" size="sm">{user ? "Dashboard" : "Log in"}</Button></Link>
-            <Link to={primary.to}><Button size="sm">{primary.label}</Button></Link>
+            <Link to={primary.to} className={buttonClasses("ghost", "sm")}>{user ? "Dashboard" : "Log in"}</Link>
+            <Link to={primary.to} className={buttonClasses("primary", "sm")}>{primary.label}</Link>
           </div>
         </div>
       </header>
@@ -112,14 +112,10 @@ export default function Landing() {
               follow workouts and get coaching that actually knows your numbers.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
-              <Link to={primary.to} className="w-full sm:w-auto">
-                <Button size="lg" className="w-full sm:w-auto">
-                  {primary.label} <ArrowRight className="h-4 w-4" />
-                </Button>
+              <Link to={primary.to} className={buttonClasses("primary", "lg", "w-full sm:w-auto")}>
+                {primary.label} <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link to="/auth" className="w-full sm:w-auto">
-                <Button variant="secondary" size="lg" className="w-full sm:w-auto">I have an account</Button>
-              </Link>
+              <Link to="/auth" className={buttonClasses("secondary", "lg", "w-full sm:w-auto")}>I have an account</Link>
             </div>
             <p className="mt-4 text-[13px] text-ink-faint">Free to start · Works with any gym</p>
           </div>
@@ -230,8 +226,8 @@ export default function Landing() {
           <p className="mx-auto mt-3 max-w-md text-ink-muted">
             Join members who track what matters and let the data do the talking.
           </p>
-          <Link to={primary.to} className="mt-8 inline-block">
-            <Button size="lg">{primary.label} <ArrowRight className="h-4 w-4" /></Button>
+          <Link to={primary.to} className={buttonClasses("primary", "lg", "mt-8")}>
+            {primary.label} <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       </section>

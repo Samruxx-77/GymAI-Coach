@@ -139,6 +139,7 @@ export default async function handleCoach(req, res, body) {
   try {
     if (!requirePost(req, res)) {
       status = 405;
+      logRequest({ endpoint: "/api/ai/coach", method: req.method, userId, status, ms: Date.now() - started });
       return;
     }
     // Costly AI call — only signed-in members may use it.

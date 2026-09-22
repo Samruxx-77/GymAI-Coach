@@ -840,3 +840,60 @@ for delete using (
   bucket_id = 'avatars'
   and auth.uid()::text = (storage.foldername(name))[1]
 );
+
+-- ═══════════════════════════════════════════════════════════════════
+-- 2026-09-22 audit remediation — query + RLS integrity hardening.
+-- Idempotent: safe to re-run on live via the SQL Editor.
+-- ═══════════════════════════════════════════════════════════════════
+
+-- 1. workouts are listed per owner — index the lookup.
+create index if not exists workouts_user_updated
+  on public.workouts (user_id, updated_at desc);
+
+-- 2. ai_messages: the conversation must belong to the same user —
+-- a matching user_id column alone is not enough, since the client
+-- supplies both values on insert.
+drop policy if exists "owner all" on public.ai_messages;
+create policy "ai_messages owner via conversation" on public.ai_messages
+  for all
+  using (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.ai_conversations c
+      where c.id = ai_messages.conversation_id and c.user_id = auth.uid()
+    )
+  )
+  with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.ai_conversations c
+      where c.id = ai_messages.conversation_id and c.user_id = auth.uid()
+    )
+  );
+
+-- 3. workout_exercises: line items may only reference system exercises
+-- (user_id is null) or the caller's own custom exercises — never another
+-- member's private exercise.
+drop policy if exists "write via workout" on public.workout_exercises;
+create policy "write via workout" on public.workout_exercises
+  for all
+  using (
+    exists (select 1 from public.workouts w where w.id = workout_id and w.user_id = auth.uid())
+  )
+  with check (
+    exists (select 1 from public.workouts w where w.id = workout_id and w.user_id = auth.uid())
+    and exists (
+      select 1 from public.exercises e
+      where e.id = workout_exercises.exercise_id
+        and (e.user_id is null or e.user_id = auth.uid())
+    )
+  );
+
+-- 4. Default privileges: future tables stay API-reachable with the same
+-- grants as the existing ones (RLS still isolates rows per member).
+alter default privileges in schema public
+  grant select, insert, update, delete on tables to authenticated;
+alter default privileges in schema public
+  grant select on tables to anon;
+alter default privileges in schema public
+  grant usage, select on sequences to authenticated;

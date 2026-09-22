@@ -11,5 +11,3 @@
 export const SUPPORT_EMAIL = "samirbasfor056@gmail.com";
 
 export const SUPPORT_PHONE = "+916002213823";
-
-export const SUPPORT_EMAIL_SUBJECT = "GymAI Coach support";

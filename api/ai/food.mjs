@@ -98,6 +98,7 @@ export default async function handleFood(req, res, body) {
   try {
     if (!requirePost(req, res)) {
       status = 405;
+      logRequest({ endpoint: "/api/ai/food", method: req.method, userId, status, ms: Date.now() - started });
       return;
     }
     // Costly vision call — only signed-in members may use it.

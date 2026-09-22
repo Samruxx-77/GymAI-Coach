@@ -159,30 +159,30 @@ export default function WorkoutBuilder() {
         <h2 className="font-semibold">Details</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <label className="mb-1.5 block text-[13px] font-medium text-ink-muted">Name</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Push Day A" />
+            <label htmlFor="workout-name" className="mb-1.5 block text-[13px] font-medium text-ink-muted">Name</label>
+            <Input id="workout-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Push Day A" />
           </div>
           <div className="sm:col-span-2">
-            <label className="mb-1.5 block text-[13px] font-medium text-ink-muted">Description</label>
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Heavy pressing focus" />
+            <label htmlFor="workout-description" className="mb-1.5 block text-[13px] font-medium text-ink-muted">Description</label>
+            <Input id="workout-description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Heavy pressing focus" />
           </div>
           <div>
-            <label className="mb-1.5 block text-[13px] font-medium text-ink-muted">Category</label>
-            <Select value={category} onChange={(e) => setCategory(e.target.value as WorkoutCategory)}>
+            <label htmlFor="workout-category" className="mb-1.5 block text-[13px] font-medium text-ink-muted">Category</label>
+            <Select id="workout-category" value={category} onChange={(e) => setCategory(e.target.value as WorkoutCategory)}>
               {CATEGORIES.map((c) => <option key={c} value={c}>{c.replace(/_/g, " ")}</option>)}
             </Select>
           </div>
           <div>
-            <label className="mb-1.5 block text-[13px] font-medium text-ink-muted">Difficulty</label>
-            <Select value={difficulty} onChange={(e) => setDifficulty(e.target.value as typeof difficulty)}>
+            <label htmlFor="workout-difficulty" className="mb-1.5 block text-[13px] font-medium text-ink-muted">Difficulty</label>
+            <Select id="workout-difficulty" value={difficulty} onChange={(e) => setDifficulty(e.target.value as typeof difficulty)}>
               <option value="beginner">Beginner</option>
               <option value="intermediate">Intermediate</option>
               <option value="advanced">Advanced</option>
             </Select>
           </div>
           <div>
-            <label className="mb-1.5 block text-[13px] font-medium text-ink-muted">Planned minutes</label>
-            <Input type="number" min={5} max={240} value={minutes} onChange={(e) => setMinutes(Number(e.target.value) || 45)} />
+            <label htmlFor="workout-minutes" className="mb-1.5 block text-[13px] font-medium text-ink-muted">Planned minutes</label>
+            <Input id="workout-minutes" type="number" min={5} max={240} value={minutes} onChange={(e) => setMinutes(Number(e.target.value) || 45)} />
           </div>
           <div>
             <label className="mb-1.5 block text-[13px] font-medium text-ink-muted">Estimated from plan</label>
@@ -213,20 +213,20 @@ export default function WorkoutBuilder() {
                   </div>
                   <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                     <div>
-                      <label className="mb-1 block text-[11px] text-ink-faint">Sets</label>
-                      <Input type="number" min={1} max={20} value={l.sets} onChange={(e) => updateLine(idx, { sets: Number(e.target.value) || 1 })} className="h-9" />
+                      <label htmlFor={`workout-line-${idx}-sets`} className="mb-1 block text-[11px] text-ink-faint">Sets</label>
+                      <Input id={`workout-line-${idx}-sets`} type="number" min={1} max={20} value={l.sets} onChange={(e) => updateLine(idx, { sets: Number(e.target.value) || 1 })} className="h-9" />
                     </div>
                     <div>
-                      <label className="mb-1 block text-[11px] text-ink-faint">Reps</label>
-                      <Input value={l.reps} onChange={(e) => updateLine(idx, { reps: e.target.value })} className="h-9" placeholder="8-12" />
+                      <label htmlFor={`workout-line-${idx}-reps`} className="mb-1 block text-[11px] text-ink-faint">Reps</label>
+                      <Input id={`workout-line-${idx}-reps`} value={l.reps} onChange={(e) => updateLine(idx, { reps: e.target.value })} className="h-9" placeholder="8-12" />
                     </div>
                     <div>
-                      <label className="mb-1 block text-[11px] text-ink-faint">Rest s</label>
-                      <Input type="number" min={0} max={600} value={l.rest_seconds} onChange={(e) => updateLine(idx, { rest_seconds: Number(e.target.value) || 0 })} className="h-9" />
+                      <label htmlFor={`workout-line-${idx}-rest`} className="mb-1 block text-[11px] text-ink-faint">Rest s</label>
+                      <Input id={`workout-line-${idx}-rest`} type="number" min={0} max={600} value={l.rest_seconds} onChange={(e) => updateLine(idx, { rest_seconds: Number(e.target.value) || 0 })} className="h-9" />
                     </div>
                     <div>
-                      <label className="mb-1 block text-[11px] text-ink-faint">Notes</label>
-                      <Input value={l.notes} onChange={(e) => updateLine(idx, { notes: e.target.value })} className="h-9" placeholder="optional" />
+                      <label htmlFor={`workout-line-${idx}-notes`} className="mb-1 block text-[11px] text-ink-faint">Notes</label>
+                      <Input id={`workout-line-${idx}-notes`} value={l.notes} onChange={(e) => updateLine(idx, { notes: e.target.value })} className="h-9" placeholder="optional" />
                     </div>
                   </div>
                 </li>
@@ -242,7 +242,7 @@ export default function WorkoutBuilder() {
           <h2 className="font-semibold">Exercise library</h2>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search exercises…" className="w-56 pl-9" />
+            <Input aria-label="Search exercises" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search exercises…" className="w-56 pl-9" />
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -277,8 +277,9 @@ export default function WorkoutBuilder() {
               <p className="text-[14px] font-medium text-ink">Create own exercise</p>
               <div className="mt-2 grid gap-2 sm:grid-cols-3">
                 <div className="sm:col-span-3">
-                  <label className="mb-1 block text-[11px] text-ink-faint">Exercise name</label>
+                  <label htmlFor="custom-exercise-name" className="mb-1 block text-[11px] text-ink-faint">Exercise name</label>
                   <Input
+                    id="custom-exercise-name"
                     value={customName}
                     onChange={(e) => setCustomName(e.target.value)}
                     placeholder="e.g. Incline DB Fly"
@@ -286,16 +287,16 @@ export default function WorkoutBuilder() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-[11px] text-ink-faint">Muscle group</label>
-                  <Select value={customGroup} onChange={(e) => setCustomGroup(e.target.value as MuscleGroup)} className="h-9">
+                  <label htmlFor="custom-exercise-group" className="mb-1 block text-[11px] text-ink-faint">Muscle group</label>
+                  <Select id="custom-exercise-group" value={customGroup} onChange={(e) => setCustomGroup(e.target.value as MuscleGroup)} className="h-9">
                     {(["chest", "back", "shoulders", "arms", "legs", "core", "full_body", "cardio"] as MuscleGroup[]).map((g) => (
                       <option key={g} value={g}>{g.replace(/_/g, " ")}</option>
                     ))}
                   </Select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-[11px] text-ink-faint">Equipment</label>
-                  <Select value={customEquipment} onChange={(e) => setCustomEquipment(e.target.value)} className="h-9">
+                  <label htmlFor="custom-exercise-equipment" className="mb-1 block text-[11px] text-ink-faint">Equipment</label>
+                  <Select id="custom-exercise-equipment" value={customEquipment} onChange={(e) => setCustomEquipment(e.target.value)} className="h-9">
                     {["barbell", "dumbbell", "machine", "cable", "bodyweight", "kettlebell", "band", "cardio"].map((eq) => (
                       <option key={eq} value={eq}>{eq}</option>
                     ))}

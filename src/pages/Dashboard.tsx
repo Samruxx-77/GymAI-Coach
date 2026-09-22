@@ -4,7 +4,7 @@ import {
   ArrowRight, CheckCircle2, Flame, LineChart as LineChartIcon, MessageCircle,
   ScanLine, Target, Dumbbell, Scale,
 } from "lucide-react";
-import { Card, Badge, ProgressBar, Button } from "../components/ui";
+import { Card, Badge, ProgressBar, buttonClasses } from "../components/ui";
 import ThemeDots from "../components/ThemeDots";
 import { useData } from "../context/DataContext";
 import { useProfile } from "../context/ProfileContext";
@@ -118,8 +118,8 @@ export default function Dashboard() {
             <p className="mt-1.5 text-[15px] font-medium text-ink">{mission}</p>
             {insight && <p className="mt-1 text-[13px] text-ink-muted">{insight.body}</p>}
           </div>
-          <Link to="/app/coach" className="shrink-0">
-            <Button variant="secondary" size="sm"><MessageCircle className="h-4 w-4" /> Ask coach</Button>
+          <Link to="/app/coach" className={buttonClasses("secondary", "sm", "shrink-0")}>
+            <MessageCircle className="h-4 w-4" /> Ask coach
           </Link>
         </div>
       </Card>
@@ -168,10 +168,8 @@ export default function Dashboard() {
               <p className="display text-2xl font-bold tnum text-ink">{weekWorkoutCount}<span className="text-sm font-medium text-ink-muted">/{profile.weekly_workout_target}</span></p>
               <p className="text-[13px] text-ink-muted">sessions this week</p>
             </div>
-            <Link to="/app/workouts">
-              <Button size="sm">
-                {workoutDoneToday ? "View workouts" : "Start training"} <ArrowRight className="h-4 w-4" />
-              </Button>
+            <Link to="/app/workouts" className={buttonClasses("primary", "sm")}>
+              {workoutDoneToday ? "View workouts" : "Start training"} <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="mt-4">

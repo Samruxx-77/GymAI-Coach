@@ -22,6 +22,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     status = 405;
+    logRequest({ endpoint: "/api/account/delete", method: req.method, userId, status, ms: Date.now() - started });
     return json(res, 405, { error: "Method not allowed." });
   }
 
