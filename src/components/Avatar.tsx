@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import { cn } from "../lib/utils";
 
 export interface AvatarDef {
@@ -53,6 +53,23 @@ export function Avatar({ avatarId, name, className, showMark = true }: AvatarPro
   const uid = useId().replace(/[:]/g, "");
   const def = avatarById(avatarId);
   const initial = (name ?? "").trim().charAt(0).toUpperCase() || "G";
+
+  const isUploadUrl = !def && avatarId != null && /^https?:\/\//i.test(avatarId);
+  const [imgFailed, setImgFailed] = useState(false);
+  if (isUploadUrl && !imgFailed) {
+    // Uploaded profile photo: render the image directly; fall back to
+    // initials if the image fails to load (e.g. deleted from storage).
+    return (
+      <div className={cn("relative shrink-0 overflow-hidden rounded-xl", className)} aria-hidden>
+        <img
+          src={avatarId}
+          alt=""
+          className="block h-full w-full object-cover"
+          onError={() => setImgFailed(true)}
+        />
+      </div>
+    );
+  }
 
   if (!def) {
     // No variant chosen: solid initials chip sized by the parent via `em`.
