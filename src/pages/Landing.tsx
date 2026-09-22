@@ -129,6 +129,7 @@ export default function Landing() {
             <video
               className="absolute inset-0 h-full w-full object-cover"
               src={heroVideo}
+              poster={heroBg}
               autoPlay
               muted
               loop
@@ -172,7 +173,7 @@ export default function Landing() {
       <section aria-label="What's inside" className="marquee-mask overflow-hidden border-y border-line bg-surface-1/40 py-4">
         <div className="marquee">
           {[...STATS, ...STATS].map((s, i) => (
-            <div key={i} className="flex items-center gap-2.5 whitespace-nowrap">
+            <div key={i} aria-hidden={i >= STATS.length} className="flex items-center gap-2.5 whitespace-nowrap">
               <s.icon className="h-4 w-4 text-accent-300" />
               <span className="display tnum text-base font-bold">{s.value}</span>
               <span className="text-[13px] text-ink-muted">{s.label}</span>
