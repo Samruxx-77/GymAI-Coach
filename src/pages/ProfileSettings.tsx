@@ -21,7 +21,7 @@ import { useTheme } from "../context/ThemeContext";
 import { supabase } from "../lib/supabase";
 import { calculateTargets, goalLabel } from "../lib/nutrition";
 import { deleteAccount } from "../lib/account";
-import { SUPPORT_EMAIL } from "../lib/contact";
+import { SUPPORT_EMAIL, SUPPORT_PHONE } from "../lib/contact";
 import { rankForXp } from "../lib/gamification";
 import { THEMES, THEME_IDS } from "../lib/themes";
 import { cn, formatNumber } from "../lib/utils";
@@ -614,6 +614,14 @@ export default function ProfileSettings() {
         <p className="mt-1 text-[13px] text-ink-muted">
           How we handle your data, and the rules for using GymAI Coach.
         </p>
+        {SUPPORT_EMAIL && (
+          <p className="mt-3 text-[13px] text-ink-muted">
+            Need help? Email us at{" "}
+            <a className="text-accent-300 hover:underline" href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
+            {" "}or call{" "}
+            <a className="text-accent-300 hover:underline" href={`tel:${SUPPORT_PHONE.replace(/\s/g, "")}`}>{SUPPORT_PHONE}</a>.
+          </p>
+        )}
         <div className="mt-4 flex flex-wrap gap-2">
           <Link to="/privacy">
             <Button variant="ghost">Privacy Policy</Button>
