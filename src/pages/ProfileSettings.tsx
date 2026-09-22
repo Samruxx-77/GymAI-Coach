@@ -511,10 +511,16 @@ export default function ProfileSettings() {
           variant="danger"
           className="mt-4"
           onClick={async () => {
-            await signOut();
-            // Full reload: guarantees the auth state is cleared before the
-            // landing page renders (avoids a stale-session bounce to /auth).
-            window.location.assign("/");
+            // try/finally: even if the sign-out request itself throws
+            // (flaky network), the session is cleared locally and we
+            // still land on the landing page — never stuck signed in.
+            try {
+              await signOut();
+            } finally {
+              // Full reload: guarantees the auth state is cleared before the
+              // landing page renders (avoids a stale-session bounce to /auth).
+              window.location.assign("/");
+            }
           }}
         >
           <LogOut className="h-4 w-4" /> Sign out

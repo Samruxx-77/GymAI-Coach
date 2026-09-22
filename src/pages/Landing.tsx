@@ -2,11 +2,13 @@ import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
+  Check,
   ChefHat,
   Dumbbell,
   Flame,
   LineChart,
   MessageCircle,
+  Palette,
   ScanLine,
   Sparkles,
   Trophy,
@@ -15,9 +17,12 @@ import {
 import { Button } from "../components/ui";
 import { Logo } from "../components/Logo";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
+import { THEMES, THEME_IDS } from "../lib/themes";
+import { cn } from "../lib/utils";
 import { prefersReducedMotion } from "../lib/env";
-import Hero3D from "../components/three/Hero3D";
 import heroArt from "../assets/hero-gym.svg";
+import heroVideo from "../assets/landing-hero.mp4";
 
 const STATS = [
   { icon: Dumbbell, value: "42", label: "guided exercises" },
@@ -70,6 +75,7 @@ function TiltCard({ children }: { children: React.ReactNode }) {
 
 export default function Landing() {
   const { user } = useAuth();
+  const { theme, setTheme } = useTheme();
   const primary = { to: user ? "/app" : "/auth", label: user ? "Open app" : "Start free" };
 
   return (
@@ -126,9 +132,21 @@ export default function Landing() {
             <p className="mt-4 text-[13px] text-ink-faint">Free to start · Works with any gym</p>
           </div>
 
-          {/* 3D stage */}
-          <div className="relative mx-auto h-[340px] w-full max-w-lg sm:h-[420px] lg:h-[500px]">
-            <Hero3D className="absolute inset-0" />
+          {/* Video stage — AI-generated gym film, stat chips float over it */}
+          <div className="relative mx-auto h-[340px] w-full max-w-lg overflow-hidden rounded-3xl border border-line shadow-[0_24px_60px_-20px_rgba(0,0,0,0.55)] sm:h-[420px] lg:h-[500px]">
+            <video
+              className="absolute inset-0 h-full w-full object-cover"
+              src={heroVideo}
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              aria-hidden
+            />
+            {/* soft fade so the video melts into the page + keeps chips readable */}
+            <div aria-hidden className="pointer-events-none absolute inset-0"
+              style={{ background: "linear-gradient(to top, color-mix(in oklab, var(--color-surface-0) 55%, transparent) 0%, transparent 35%, transparent 70%, color-mix(in oklab, var(--color-surface-0) 25%, transparent) 100%)" }} />
 
             {/* floating stat chips (DOM overlay — crisp text over WebGL) */}
             <div aria-hidden className="pointer-events-none absolute inset-0 hidden sm:block">
@@ -187,6 +205,52 @@ export default function Landing() {
               <p className="mt-1.5 text-[14px] leading-relaxed text-ink-muted">{f.body}</p>
             </TiltCard>
           ))}
+        </div>
+      </section>
+
+      {/* Set the theme of the app — live preview, applies instantly */}
+      <section className="relative overflow-hidden border-y border-line bg-surface-1/40">
+        <div aria-hidden className="pointer-events-none absolute inset-0"
+          style={{ background: "radial-gradient(700px 340px at 50% 0%, var(--color-accent-soft), transparent)" }} />
+        <div className="relative mx-auto max-w-6xl px-5 py-16">
+          <div className="flex items-center justify-center gap-2">
+            <Palette className="h-5 w-5 text-accent-300" />
+            <h2 className="display text-center text-3xl font-bold">Set the theme of the app</h2>
+          </div>
+          <p className="mx-auto mt-3 max-w-md text-center text-ink-muted">
+            Pick a mood — the whole page re-skins live, and your choice carries into the app.
+          </p>
+          <div className="mx-auto mt-8 grid max-w-3xl grid-cols-2 gap-3 sm:grid-cols-3">
+            {THEME_IDS.map((id) => {
+              const t = THEMES[id];
+              const active = theme === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setTheme(id)}
+                  className={cn(
+                    "theme-swatch cursor-pointer rounded-2xl border border-line bg-surface-1 p-3 text-left transition-all hover:-translate-y-0.5",
+                    active && "border-accent shadow-[0_0_0_2px_var(--color-accent-soft)]"
+                  )}
+                >
+                  <span className="flex h-12 overflow-hidden rounded-xl border border-line">
+                    <span className="w-1/3" style={{ background: t.surfaces[0] }} />
+                    <span className="w-1/3" style={{ background: t.surfaces[1] }} />
+                    <span className="w-1/3" style={{ background: t.accent }} />
+                  </span>
+                  <span className="mt-2.5 flex items-center justify-between">
+                    <span>
+                      <span className="block text-sm font-semibold text-ink">{t.name}</span>
+                      <span className="block text-[11px] text-ink-faint">{t.tagline}</span>
+                    </span>
+                    {active && <Check className="h-4 w-4 shrink-0 text-accent-300" />}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </section>
 

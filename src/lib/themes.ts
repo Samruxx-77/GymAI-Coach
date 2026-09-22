@@ -134,9 +134,9 @@ const STORAGE_KEY = "gymai-theme";
 export function loadTheme(): ThemeId {
   try {
     const t = localStorage.getItem(STORAGE_KEY);
-    return t && t in THEMES ? (t as ThemeId) : "cream";
+    return t && t in THEMES ? (t as ThemeId) : "light";
   } catch {
-    return "cream";
+    return "light";
   }
 }
 
