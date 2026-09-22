@@ -17,6 +17,7 @@ export function FoodScanner() {
   const [busy, setBusy] = useState(false);
   const [logBusy, setLogBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dupeWarning, setDupeWarning] = useState<{ name: string; calories: number } | null>(null);
   const [result, setResult] = useState<FoodScanResponse | null>(null);
   const [mealType, setMealType] = useState<MealType>("lunch");
   const [logged, setLogged] = useState(false);
@@ -39,6 +40,7 @@ export function FoodScanner() {
   function pick(file: File | undefined | null) {
     if (!file) return;
     setError(null);
+    setDupeWarning(null);
     setResult(null);
     setLogged(false);
     const reader = new FileReader();
@@ -75,21 +77,20 @@ export function FoodScanner() {
     return `${name.trim().toLowerCase()}|${calories}|${protein}`;
   }
 
-  async function log() {
+  async function log(force = false) {
     if (!result || logBusy) return; // in-flight guard: no double log
     const name = edit.name || result.name;
     const calories = Math.round(Number(edit.calories) || 0);
     const protein = Math.round(Number(edit.protein) || 0);
 
-    // Short-window duplicate guard: identical entry just logged → confirm.
+    // Short-window duplicate guard: identical entry just logged → ask inline.
     const sig = signature(name, calories, protein);
     const recent = lastLogged.current;
-    if (recent && recent.sig === sig && Date.now() - recent.at < DUPE_WINDOW_MS) {
-      const ok = window.confirm(
-        `"${name}" (${formatNumber(calories)} kcal) was just logged. Add it again anyway?`
-      );
-      if (!ok) return;
+    if (!force && recent && recent.sig === sig && Date.now() - recent.at < DUPE_WINDOW_MS) {
+      setDupeWarning({ name, calories });
+      return;
     }
+    setDupeWarning(null);
 
     setLogBusy(true);
     setError(null);
@@ -231,9 +232,17 @@ export function FoodScanner() {
                     {logged ? (
                       <Badge tone="success"><CheckCircle2 className="h-3.5 w-3.5" /> Logged — scan another or retake</Badge>
                     ) : (
-                      <Button onClick={log} loading={logBusy} disabled={logBusy}>
+                      <Button onClick={() => log()} loading={logBusy} disabled={logBusy}>
                         <CheckCircle2 className="h-4 w-4" /> Log to diary
                       </Button>
+                    )}
+                    {dupeWarning && !logged && (
+                      <div className="flex w-full flex-wrap items-center gap-2 rounded-xl bg-data-amber/10 px-3 py-2 text-[13px] text-ink">
+                        <TriangleAlert className="h-4 w-4 shrink-0 text-data-amber" />
+                        <span className="flex-1">“{dupeWarning.name}” ({formatNumber(dupeWarning.calories)} kcal) was just logged. Add it again?</span>
+                        <Button size="sm" variant="secondary" onClick={() => log(true)} disabled={logBusy}>Yes, add again</Button>
+                        <Button size="sm" variant="ghost" onClick={() => setDupeWarning(null)}>Keep single</Button>
+                      </div>
                     )}
                   </div>
                 </div>

@@ -5,6 +5,14 @@
 import { json } from "./_lib/validate.mjs";
 
 export default async function handleHealth(req, res) {
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    try {
+      res.setHeader("Allow", "GET");
+    } catch {
+      /* already sent — ignore */
+    }
+    return json(res, 405, { error: "Method not allowed." });
+  }
   json(res, 200, {
     status: "ok",
     ai: {

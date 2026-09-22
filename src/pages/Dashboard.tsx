@@ -11,7 +11,7 @@ import { useProfile } from "../context/ProfileContext";
 import { useAuth } from "../context/AuthContext";
 import { dailyInsight, todayMission } from "../lib/insights";
 import { goalLabel } from "../lib/nutrition";
-import { formatNumber, goalProgressPercent, todayKey } from "../lib/utils";
+import { formatNumber, goalProgressPercent, todayKey, trendTone } from "../lib/utils";
 import { supabase } from "../lib/supabase";
 import { recomputeXpCache } from "../lib/xp";
 
@@ -34,6 +34,12 @@ export default function Dashboard() {
         .from("xp_events")
         .insert({ user_id: user.id, source: "daily_login", ref_id: null, day: todayKey() })
         .then(async ({ error }) => {
+          // Two tabs racing both insert — the partial unique index rejects
+          // the loser with 23505, which is the intended dedupe (not an error).
+          if (error && error.code !== "23505") {
+            console.error("daily_login XP failed:", error.message);
+            return;
+          }
           if (!error) await recomputeXpCache(user.id);
         });
     }
@@ -141,7 +147,7 @@ export default function Dashboard() {
               <p className="display text-2xl font-bold tnum text-ink">{formatNumber(latestWeight ?? 0, 1)} <span className="text-sm font-medium text-ink-muted">kg</span></p>
             </div>
             {weightTrendKg != null && (
-              <p className={cnTrend(weightTrendKg)}>
+              <p className={cnTrend(weightTrendKg, profile?.primary_goal)}>
                 {weightTrendKg > 0 ? "+" : ""}{weightTrendKg.toFixed(1)} kg / 4 wks
               </p>
             )}
@@ -240,8 +246,11 @@ function NutritionCard({
   );
 }
 
-function cnTrend(delta: number) {
-  return `text-[13px] font-medium tnum ${delta <= 0 ? "text-success" : "text-danger"}`;
+function cnTrend(delta: number, goal: string | null | undefined) {
+  const tone = trendTone(delta, goal);
+  return `text-[13px] font-medium tnum ${
+    tone === "good" ? "text-success" : tone === "bad" ? "text-danger" : "text-ink-muted"
+  }`;
 }
 function cnPct(over: boolean) {
   return `text-[13px] tnum ${over ? "text-data-amber" : "text-ink-muted"}`;

@@ -113,21 +113,32 @@ export function ProgressBar({
   value,
   className,
   tone = "accent",
+  label,
 }: {
   value: number;
   className?: string;
   tone?: "accent" | "success" | "warning";
+  /** Accessible label for screen readers, e.g. "Protein progress". */
+  label?: string;
 }) {
   const tones = {
     accent: "bg-accent",
     success: "bg-success",
     warning: "bg-data-amber",
   };
+  const pct = Math.min(100, Math.max(0, value));
   return (
-    <div className={cn("h-2 w-full overflow-hidden rounded-full bg-surface-2", className)}>
+    <div
+      className={cn("h-2 w-full overflow-hidden rounded-full bg-surface-2", className)}
+      role="progressbar"
+      aria-valuenow={Math.round(pct)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      {...(label ? { "aria-label": label } : {})}
+    >
       <div
         className={cn("h-full rounded-full transition-all duration-500", tones[tone])}
-        style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
+        style={{ width: `${pct}%` }}
       />
     </div>
   );

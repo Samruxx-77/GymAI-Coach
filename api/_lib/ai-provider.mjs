@@ -22,9 +22,15 @@
  * Swapping providers = editing this file alone.
  */
 
-const TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS || 40_000);
+function envMs(name, fallback) {
+  const n = Number(process.env[name]);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+// Budgets stay UNDER the client timeouts so the server's error surfaces
+// first (client coach = 30s, client food scan = 55s, Vercel maxDuration = 60s).
+const TIMEOUT_MS = envMs("AI_TIMEOUT_MS", 25_000);
 /** Vision/food analysis needs a roomier budget than text chat. */
-const FOOD_TIMEOUT_MS = Number(process.env.AI_FOOD_TIMEOUT_MS || 90_000);
+const FOOD_TIMEOUT_MS = envMs("AI_FOOD_TIMEOUT_MS", 50_000);
 
 class ProviderError extends Error {
   constructor(message, { status, provider } = {}) {
@@ -131,9 +137,13 @@ async function callOpenRouter({ systemPrompt, messages, imageBase64, json, timeo
   // usually sits in a different upstream pool.
   const params = { systemPrompt, messages, imageBase64, json };
   const errors = [];
+  let providerCalls = 0;
   for (const model of orModelChain({ imageBase64 })) {
+    providerCalls += 1;
     try {
-      return await orOnce(model, params, timeoutMs);
+      const result = await orOnce(model, params, timeoutMs);
+      result.providerCalls = providerCalls;
+      return result;
     } catch (err) {
       // 401 = the API key itself is bad — no other model can succeed.
       if (err?.status === 401) {
@@ -142,12 +152,20 @@ async function callOpenRouter({ systemPrompt, messages, imageBase64, json, timeo
           { status: 401 }
         );
       }
+      // A 400 that is NOT about this model (bad request shape, policy
+      // rejection) will fail identically on every model — fail fast
+      // instead of burning the fallback chain on a doomed request. Only
+      // model-specific 400s (dead/retired slugs) move to the next model.
+      if (err?.status === 400 && !/no endpoints found|model.*not found|invalid model|unknown model/i.test(err?.message || "")) {
+        throw err;
+      }
       errors.push(`${model}: ${err?.message || err}`);
     }
   }
   const exhausted = new ProviderError(`All OpenRouter models failed. ${errors.join(" | ")}`, {
     status: 502,
   });
+  exhausted.providerCalls = providerCalls;
   // Safe, user-facing explanation — survives the 5xx sanitizer in errorResponse.
   exhausted.userMessage =
     "The free AI models are busy right now. Please wait a moment and try again.";
@@ -157,6 +175,7 @@ async function callOpenRouter({ systemPrompt, messages, imageBase64, json, timeo
 /** Detect the image MIME type from base64 magic bytes (default: jpeg). */
 function sniffImageMime(b64) {
   if (b64.startsWith("iVBOR")) return "image/png";
+  if (b64.startsWith("R0lGOD")) return "image/gif";
   if (b64.startsWith("Qk")) return "image/bmp";
   if (b64.startsWith("UklGR")) return "image/webp";
   return "image/jpeg";
@@ -230,7 +249,7 @@ async function callGemini({ systemPrompt, messages, imageBase64, json }) {
 
 /**
  * Run a completion against the primary provider; on failure, fall back.
- * @returns {Promise<{text: string, provider: string, fallbackUsed: boolean}>}
+ * @returns {Promise<{text: string, provider: string, fallbackUsed: boolean, providerCalls: number}>}
  */
 export async function runCompletion(params) {
   // Vision requests (food scans) reason over large images on free-tier
@@ -238,11 +257,19 @@ export async function runCompletion(params) {
   const timeoutMs = params.timeoutMs ?? (params.imageBase64 ? FOOD_TIMEOUT_MS : TIMEOUT_MS);
   const attempts = [callOpenRouter, callGemini];
   const errors = [];
+  let providerCalls = 0;
+  let lastUserMessage = null;
   for (const [i, fn] of attempts.entries()) {
     try {
       const result = await fn(params);
-      return { ...result, fallbackUsed: i > 0 };
+      return {
+        ...result,
+        fallbackUsed: i > 0,
+        providerCalls: providerCalls + (result.providerCalls || 1),
+      };
     } catch (err) {
+      providerCalls += err?.providerCalls || 1;
+      if (err?.userMessage) lastUserMessage = err.userMessage;
       const status = err?.status || 500;
       const isClientError = status === 400 || status === 401 || status === 403;
       errors.push(`${fn.name}: ${err?.message || err}`);
@@ -253,6 +280,10 @@ export async function runCompletion(params) {
   }
   const err = new Error(`No AI provider available. ${errors.join(" | ")}`);
   err.statusCode = 503;
+  err.providerCalls = providerCalls;
+  // Preserve the friendly explanation (e.g. "free AI models are busy")
+  // instead of letting the Gemini 501 swallow it into a generic message.
+  if (lastUserMessage) err.userMessage = lastUserMessage;
   throw err;
 }
 

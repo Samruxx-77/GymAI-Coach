@@ -4,6 +4,7 @@ import { Clock, Dumbbell, History, Pencil, Play, Plus, Repeat, Trash2 } from "lu
 import { Card, Button, Badge, EmptyState } from "../components/ui";
 import { useData } from "../context/DataContext";
 import { useProfile } from "../context/ProfileContext";
+import { cn } from "../lib/utils";
 import { ProgressBar } from "../components/ui";
 
 export default function Workouts() {
@@ -11,6 +12,7 @@ export default function Workouts() {
   const { profile } = useProfile();
   const navigate = useNavigate();
   const [tab, setTab] = useState<"templates" | "mine">("templates");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const weeklyTarget = profile?.weekly_workout_target ?? 3;
 
@@ -108,10 +110,20 @@ export default function Workouts() {
                     </Button>
                     <Button
                       size="sm" variant="ghost"
-                      className="ml-auto text-danger hover:bg-danger/10"
-                      onClick={() => { if (confirm(`Delete "${w.name}"?`)) void deleteWorkout(w.id); }}
+                      className={cn("ml-auto", confirmDeleteId === w.id ? "bg-danger/15 text-danger" : "text-danger hover:bg-danger/10")}
+                      onClick={() => {
+                        if (confirmDeleteId === w.id) {
+                          setConfirmDeleteId(null);
+                          void deleteWorkout(w.id);
+                        } else {
+                          setConfirmDeleteId(w.id);
+                        }
+                      }}
+                      onBlur={() => setConfirmDeleteId((id) => (id === w.id ? null : id))}
+                      aria-label={confirmDeleteId === w.id ? `Confirm delete "${w.name}"` : `Delete "${w.name}"`}
+                      title={confirmDeleteId === w.id ? "Tap again to confirm" : "Delete"}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      {confirmDeleteId === w.id ? <span className="text-[12px] font-semibold">Sure?</span> : <Trash2 className="h-3.5 w-3.5" />}
                     </Button>
                   </>
                 )}

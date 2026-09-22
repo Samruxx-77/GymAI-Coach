@@ -49,20 +49,22 @@ export default function Nutrition() {
 
   /* quick-add in-flight guard: key of the chip currently being logged */
   const [quickBusy, setQuickBusy] = useState<string | null>(null);
+  const [quickError, setQuickError] = useState<string | null>(null);
 
-  /* Diary / Scan tabs — deep-linkable via ?mode=scan */
+  /* Diary / Scan tabs — deep-linkable via ?mode=scan.
+     The tab is derived from the URL so browser Back/Forward stays in sync. */
   const [params, setParams] = useSearchParams();
-  const [tab, setTab] = useState<"diary" | "scan">(
-    params.get("mode") === "scan" ? "scan" : "diary"
-  );
+  const tab: "diary" | "scan" = params.get("mode") === "scan" ? "scan" : "diary";
   function selectTab(t: "diary" | "scan") {
-    setTab(t);
-    setParams((p) => {
-      const next = new URLSearchParams(p);
-      if (t === "scan") next.set("mode", "scan");
-      else next.delete("mode");
-      return next;
-    }, { replace: true });
+    setParams(
+      (p) => {
+        const next = new URLSearchParams(p);
+        if (t === "scan") next.set("mode", "scan");
+        else next.delete("mode");
+        return next;
+      },
+      { replace: true }
+    );
   }
 
   const set = <K extends keyof FoodForm>(k: K, v: FoodForm[K]) => setForm((f) => ({ ...f, [k]: v }));
@@ -255,7 +257,8 @@ export default function Nutrition() {
               onClick={async () => {
                 if (quickBusy) return;
                 setQuickBusy(q.name);
-                await addFood({
+                setQuickError(null);
+                const { error } = await addFood({
                   entry_date: todayKey(),
                   meal_type: "snack",
                   name: q.name,
@@ -268,6 +271,8 @@ export default function Nutrition() {
                   source: "quick",
                   ai_confidence: null,
                 });
+                // Quick-add failures were previously silent — surface them.
+                if (error) setQuickError(`Could not log ${q.name}: ${error}`);
                 setQuickBusy(null);
               }}
               className="cursor-pointer rounded-full border border-line bg-surface-2 px-3 py-1.5 text-[13px] text-ink transition-colors hover:border-accent hover:bg-accent-soft disabled:cursor-wait disabled:opacity-60"
@@ -276,6 +281,7 @@ export default function Nutrition() {
             </button>
           ))}
         </div>
+        {quickError && <p className="mt-3 text-[13px] text-danger">{quickError}</p>}
       </Card>
 
       {/* Meals */}

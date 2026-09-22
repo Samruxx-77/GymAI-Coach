@@ -11,7 +11,7 @@ interface DraftSet { weight: string; reps: string; done: boolean; }
 export default function WorkoutSession() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { templates, userWorkouts, logSession } = useData();
+  const { templates, userWorkouts, logSession, loading } = useData();
   const workout = useMemo(
     () => [...templates, ...userWorkouts].find((w) => w.id === id) ?? null,
     [templates, userWorkouts, id]
@@ -23,6 +23,10 @@ export default function WorkoutSession() {
   const [error, setError] = useState<string | null>(null);
   const [logs, setLogs] = useState<Record<string, DraftSet[]>>({});
   const startRef = useRef(Date.now());
+  // Two-step quit: first tap arms, second tap confirms (auto-disarms after 5s).
+  const [confirmingQuit, setConfirmingQuit] = useState(false);
+  const quitTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(quitTimer.current), []);
 
   /* init per-exercise drafts from template reps */
   useEffect(() => {
@@ -36,17 +40,38 @@ export default function WorkoutSession() {
     setLogs(next);
   }, [workout?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* elapsed + rest timers */
+  /* elapsed + rest timers — one stable interval; the rest countdown
+     lives in a ref so the interval is never recreated every second. */
+  const restLeftRef = useRef<number | null>(null);
   useEffect(() => {
     const t = setInterval(() => {
       setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
-      if (restLeft != null) {
-        if (restLeft <= 1) setRestLeft(null);
-        else setRestLeft(restLeft - 1);
+      if (restLeftRef.current != null) {
+        if (restLeftRef.current <= 1) {
+          restLeftRef.current = null;
+          setRestLeft(null);
+        } else {
+          restLeftRef.current -= 1;
+          setRestLeft(restLeftRef.current);
+        }
       }
     }, 1000);
     return () => clearInterval(t);
-  }, [restLeft]);
+  }, []);
+
+  function startRest(seconds: number) {
+    restLeftRef.current = seconds;
+    setRestLeft(seconds);
+  }
+
+  if (loading) {
+    return (
+      <div className="page-fade space-y-5">
+        <div className="skeleton h-8 w-48" />
+        <div className="skeleton h-64" />
+      </div>
+    );
+  }
 
   if (!workout) {
     return <EmptyState title="Workout not found" description="It may have been deleted." action={<Button onClick={() => navigate("/app/workouts")}>Back to workouts</Button>} />;
@@ -69,7 +94,7 @@ export default function WorkoutSession() {
     });
     // start rest timer when completing a set
     const row = logs[exId]?.[idx];
-    if (!row?.done && restSeconds > 0) setRestLeft(restSeconds);
+    if (!row?.done && restSeconds > 0) startRest(restSeconds);
   }
 
   const totalSets = plan.reduce((a, we) => a + we.sets, 0);
@@ -160,7 +185,7 @@ export default function WorkoutSession() {
             </span>
             <div className="flex items-center gap-3">
               <span className="display text-xl font-bold tnum">{restLeft}s</span>
-              <Button size="sm" variant="ghost" onClick={() => setRestLeft(null)}><X className="h-3.5 w-3.5" /> Skip</Button>
+              <Button size="sm" variant="ghost" onClick={() => { restLeftRef.current = null; setRestLeft(null); }}><X className="h-3.5 w-3.5" /> Skip</Button>
             </div>
           </div>
         </Card>
@@ -221,8 +246,18 @@ export default function WorkoutSession() {
       {error && <p className="text-[13px] text-danger">{error}</p>}
 
       <div className="sticky bottom-20 flex gap-2 lg:bottom-6">
-        <Button variant="secondary" className="flex-1" onClick={() => { if (confirm("Quit session? Logged sets will be discarded.")) navigate("/app/workouts"); }}>
-          <X className="h-4 w-4" /> Quit
+        <Button
+          variant="secondary"
+          className="flex-1"
+          onClick={() => {
+            if (confirmingQuit) navigate("/app/workouts");
+            else {
+              setConfirmingQuit(true);
+              quitTimer.current = window.setTimeout(() => setConfirmingQuit(false), 5000);
+            }
+          }}
+        >
+          <X className="h-4 w-4" /> {confirmingQuit ? "Tap again to quit" : "Quit"}
         </Button>
         <Button className="flex-[2]" loading={busy} onClick={finish}>
           <Check className="h-4 w-4" /> Finish workout

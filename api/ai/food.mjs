@@ -14,8 +14,17 @@
  * for user review before logging.
  */
 import { runCompletion } from "../_lib/ai-provider.mjs";
-import { validateFoodBody, extractJson, errorResponse, json, readJsonBody } from "../_lib/validate.mjs";
+import {
+  validateFoodBody,
+  extractJson,
+  errorResponse,
+  json,
+  readJsonBody,
+  requirePost,
+  logRequest,
+} from "../_lib/validate.mjs";
 import { requireUser, rateLimit } from "../_lib/auth.mjs";
+import { checkDailyQuota, recordUsage } from "../_lib/quota.mjs";
 
 const SYSTEM_PROMPT = `You are a nutrition estimation service. Analyze the food in the photo and estimate its nutritional content.
 
@@ -82,15 +91,42 @@ function normalizeEstimate(raw) {
 }
 
 export default async function handleFood(req, res, body) {
+  const started = Date.now();
+  const token = (req.headers?.authorization || "").replace(/^Bearer\s+/i, "").trim();
+  let status = 500;
+  let userId = null;
   try {
+    if (!requirePost(req, res)) {
+      status = 405;
+      return;
+    }
     // Costly vision call — only signed-in members may use it.
     const user = await requireUser(req, res);
-    if (!user) return;
-    if (!rateLimit(res, `food:${user.id}`, { limit: 10, windowMs: 60_000 })) return;
+    if (!user) {
+      status = 401;
+      return;
+    }
+    userId = user.id;
+    if (!rateLimit(res, `food:${user.id}`, { limit: 10, windowMs: 60_000 })) {
+      status = 429;
+      return;
+    }
 
     body = await readJsonBody(req, body);
     const check = validateFoodBody(body);
-    if (check.error) return json(res, 400, { error: check.error });
+    if (check.error) {
+      status = 400;
+      return json(res, 400, { error: check.error });
+    }
+
+    // Persistent per-user daily quota for vision calls.
+    const quota = await checkDailyQuota({ userId: user.id, token, endpoint: "food" });
+    if (!quota.allowed) {
+      status = 429;
+      return json(res, 429, {
+        error: `You've used your ${quota.limit} free food scans for today. Try again tomorrow.`,
+      });
+    }
 
     const result = await runCompletion({
       systemPrompt: SYSTEM_PROMPT,
@@ -98,17 +134,38 @@ export default async function handleFood(req, res, body) {
       imageBase64: body.imageBase64,
       json: true,
     });
+    await recordUsage({
+      userId: user.id,
+      token,
+      endpoint: "food",
+      providerCalls: result.providerCalls,
+    });
 
     const parsed = extractJson(result.text);
     const estimate = normalizeEstimate(parsed);
     if (!estimate) {
+      status = 502;
+      logRequest({ endpoint: "/api/ai/food", method: "POST", userId, status, provider: result.provider, ms: Date.now() - started });
       return json(res, 502, {
         error: "Could not analyze that image. Try another photo with clearer food.",
       });
     }
 
+    status = 200;
+    logRequest({
+      endpoint: "/api/ai/food",
+      method: "POST",
+      userId,
+      status,
+      provider: result.provider,
+      fallbackUsed: result.fallbackUsed,
+      ms: Date.now() - started,
+      extra: `quota=${quota.remaining - 1}/${quota.limit}${quota.enforced ? "" : " (unenforced)"}`,
+    });
     json(res, 200, { ...estimate, provider: result.provider, fallbackUsed: result.fallbackUsed });
   } catch (err) {
+    status = err?.statusCode || err?.status || 500;
+    logRequest({ endpoint: "/api/ai/food", method: "POST", userId, status, ms: Date.now() - started });
     errorResponse(res, err);
   }
 }

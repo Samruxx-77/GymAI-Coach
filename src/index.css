@@ -115,7 +115,7 @@ h1, h2, h3 {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 3px var(--color-accent-soft);
 }
-.field:hover:not(:focus) { border-color: #313b55; }
+.field:hover:not(:focus) { border-color: var(--color-line-strong, #313b55); }
 
 /* ── Focus ring for keyboard users ──────────────────────────────── */
 :focus-visible {

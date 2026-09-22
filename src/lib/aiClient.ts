@@ -35,7 +35,10 @@ export interface CoachResponse {
   fallbackUsed: boolean;
 }
 
-const TRANSIENT_STATUSES = new Set([408, 429, 502, 503, 504]);
+// 429 is intentionally NOT transient: retrying rate limits multiplies
+// pressure on the shared quota. The server's 429 carries a Retry-After
+// header and a friendly message — surface it, don't hammer.
+const TRANSIENT_STATUSES = new Set([408, 502, 503, 504]);
 
 async function postJson<T>(url: string, body: unknown, timeoutMs = 30_000): Promise<T> {
   let lastErr: unknown = null;
@@ -60,6 +63,17 @@ async function postJson<T>(url: string, body: unknown, timeoutMs = 30_000): Prom
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        // Honor rate limits: never retry a 429. Surface the server's
+        // friendly message (it may include a daily-quota explanation).
+        if (res.status === 429) {
+          const retryAfter = res.headers.get("Retry-After");
+          const err = new Error(
+            data?.error || "Too many requests. Please slow down and try again."
+          ) as Error & { status?: number; retryAfter?: number | null };
+          err.status = 429;
+          err.retryAfter = retryAfter ? Number(retryAfter) : null;
+          throw err;
+        }
         const err = new Error(data?.error || `Request failed (${res.status})`) as Error & { status?: number };
         err.status = res.status;
         throw err;
@@ -84,13 +98,19 @@ async function postJson<T>(url: string, body: unknown, timeoutMs = 30_000): Prom
 }
 
 export function askCoach(messages: CoachMessage[], context: CoachContext): Promise<CoachResponse> {
-  return postJson<CoachResponse>("/api/ai/coach", { messages, context });
+  // The server accepts only "user" messages (client-supplied assistant
+  // history can't be trusted), so strip our own replies before sending.
+  const userOnly = messages
+    .filter((m) => m.role === "user")
+    .map((m) => ({ role: "user" as const, content: m.content }));
+  return postJson<CoachResponse>("/api/ai/coach", { messages: userOnly, context });
 }
 
 export function scanFood(imageBase64: string): Promise<FoodScanResponse> {
-  // Vision analysis is slow on free-tier models; allow 95s (just above
-  // the server's 90s food budget so server errors surface first).
-  return postJson<FoodScanResponse>("/api/ai/food", { imageBase64 }, 95_000);
+  // Vision analysis is slow on free-tier models; allow 55s (just above
+  // the server's 50s food budget so server errors surface first, and
+  // comfortably under Vercel's 60s function limit).
+  return postJson<FoodScanResponse>("/api/ai/food", { imageBase64 }, 55_000);
 }
 
 export interface FoodScanResponse {

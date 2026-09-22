@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Button, Input } from "../components/ui";
+import { safeRedirect } from "../components/AuthGuard";
 import authArt from "../assets/auth-scene.svg";
 import { Logo } from "../components/Logo";
 
@@ -18,7 +19,7 @@ function AuthForm({ mode, setMode }: { mode: Mode; setMode: (m: Mode) => void })
   const { signIn, signUp, resetPassword, updatePassword, session } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const returnTo = params.get("returnTo") || "/app";
+  const returnTo = safeRedirect(params.get("returnTo"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");

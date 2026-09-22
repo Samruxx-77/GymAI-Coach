@@ -3,8 +3,39 @@
  */
 
 export function json(res, status, payload) {
+  // Never blow up on an already-answered request (double-response crashes).
+  if (res.headersSent || res.writableEnded) return;
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(JSON.stringify(payload));
+}
+
+/** Guard for POST-only routes: responds 405 otherwise. */
+export function requirePost(req, res) {
+  if (req.method === "POST") return true;
+  try {
+    res.setHeader("Allow", "POST");
+  } catch {
+    /* already sent — ignore */
+  }
+  json(res, 405, { error: "Method not allowed." });
+  return false;
+}
+
+/** Structured request log: route, user, provider, latency — no secrets. */
+export function logRequest({ endpoint, method, userId, status, provider, fallbackUsed, ms, extra }) {
+  const line = [
+    `[api] ${method} ${endpoint}`,
+    `user=${userId || "anon"}`,
+    `status=${status}`,
+    provider ? `provider=${provider}` : null,
+    fallbackUsed ? "fallback=yes" : null,
+    typeof ms === "number" ? `${ms}ms` : null,
+    extra || null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  if (status >= 500) console.error(line);
+  else console.log(line);
 }
 
 /**
@@ -33,7 +64,14 @@ export function clientError(res, message, status = 400) {
   json(res, status, { error: message });
 }
 
-/** Validate the coach request body: { messages: [{ role, content }] }. */
+/** Validate the coach request body: { messages: [{ role, content }] }.
+ *
+ * Only "user" messages are accepted. Past assistant replies are
+ * user-controlled data the client could forge (prompt shaping / token
+ * abuse), so the server never trusts client-supplied assistant history.
+ * Multi-turn context still comes from the user's own messages plus the
+ * profile-data system prompt built from real session data.
+ */
 export function validateCoachBody(body) {
   if (body === undefined) return { error: "invalid JSON body" };
   const messages = body?.messages;
@@ -43,7 +81,7 @@ export function validateCoachBody(body) {
   if (messages.length > 30) return { error: "too many messages" };
   for (const m of messages) {
     if (!m || typeof m !== "object") return { error: "invalid message" };
-    if (m.role !== "user" && m.role !== "assistant") {
+    if (m.role !== "user") {
       return { error: "invalid message role" };
     }
     if (typeof m.content !== "string" || !m.content.trim()) {
@@ -64,8 +102,10 @@ export function validateFoodBody(body) {
   if (!/^[A-Za-z0-9+/=\r\n]+$/.test(imageBase64)) {
     return { error: "imageBase64 must be base64" };
   }
-  // 12 MB base64 ceiling (~9 MB binary) matches the client-side downscale.
-  if (imageBase64.length > 12 * 1024 * 1024) return { error: "image too large" };
+  // 500 KB base64 ceiling (~375 KB binary). The client downscales photos
+  // to ~180 KB before sending, so this is generous — while multi-MB
+  // uploads previously reached the providers (and their bills) unchecked.
+  if (imageBase64.length > 500 * 1024) return { error: "image too large" };
   return { valid: true };
 }
 

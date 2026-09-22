@@ -55,15 +55,22 @@ export default function ProfileSettings() {
   // ── Danger zone: delete account ──
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleteTyped, setDeleteTyped] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function handleDeleteAccount() {
     if (deleteTyped.trim().toUpperCase() !== "DELETE") return;
+    // Email users must re-enter their password — a stolen session alone
+    // must never be able to wipe the account.
+    if (user?.email && !deletePassword) {
+      setDeleteError("Enter your password to confirm.");
+      return;
+    }
     setDeleting(true);
     setDeleteError(null);
     try {
-      await deleteAccount();
+      await deleteAccount(user?.email ? deletePassword : undefined);
       await signOut();
       navigate("/", { replace: true });
     } catch (err) {
@@ -533,6 +540,7 @@ export default function ProfileSettings() {
             onClick={() => {
               setConfirmingDelete(true);
               setDeleteTyped("");
+              setDeletePassword("");
               setDeleteError(null);
             }}
           >
@@ -552,12 +560,26 @@ export default function ProfileSettings() {
               disabled={deleting}
               autoComplete="off"
             />
+            {user?.email && (
+              <Input
+                className="mt-2 max-w-xs"
+                type="password"
+                placeholder="Your password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                disabled={deleting}
+                autoComplete="current-password"
+              />
+            )}
             {deleteError && <p className="mt-2 text-[13px] text-danger">{deleteError}</p>}
             <div className="mt-3 flex flex-wrap gap-2">
               <Button
                 variant="danger"
                 loading={deleting}
-                disabled={deleteTyped.trim().toUpperCase() !== "DELETE"}
+                disabled={
+                  deleteTyped.trim().toUpperCase() !== "DELETE" ||
+                  (Boolean(user?.email) && !deletePassword)
+                }
                 onClick={handleDeleteAccount}
               >
                 <Trash2 className="h-4 w-4" /> Yes, delete everything
@@ -568,6 +590,7 @@ export default function ProfileSettings() {
                 onClick={() => {
                   setConfirmingDelete(false);
                   setDeleteTyped("");
+                  setDeletePassword("");
                   setDeleteError(null);
                 }}
               >

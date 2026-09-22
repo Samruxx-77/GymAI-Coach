@@ -15,8 +15,10 @@ export default function WorkoutHistory() {
   const totals = sessions.reduce(
     (acc, s) => ({
       sessions: acc.sessions + 1,
-      minutes: acc.minutes + (s.duration_minutes ?? 0),
-      volume: acc.volume + s.total_volume_kg,
+      // numeric columns can arrive as strings from PostgREST — coerce
+      // before adding, otherwise "100" + "200" = "100200".
+      minutes: acc.minutes + (Number(s.duration_minutes) || 0),
+      volume: acc.volume + (Number(s.total_volume_kg) || 0),
     }),
     { sessions: 0, minutes: 0, volume: 0 }
   );

@@ -7,7 +7,7 @@ import { Check, Pencil, Trash2, TrendingDown, TrendingUp, X } from "lucide-react
 import { Card, Button, Input, Badge } from "../components/ui";
 import { useData } from "../context/DataContext";
 import { useProfile } from "../context/ProfileContext";
-import { dayKey, goalProgressPercent, todayKey } from "../lib/utils";
+import { cn, dayKey, goalProgressPercent, todayKey, trendTone } from "../lib/utils";
 
 function fmtDate(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
@@ -24,6 +24,7 @@ export default function Progress() {
 
   /* inline edit state for the history list */
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [editKg, setEditKg] = useState("");
   const [editNote, setEditNote] = useState("");
   const [editBusy, setEditBusy] = useState(false);
@@ -69,13 +70,15 @@ export default function Progress() {
   }, [weightEntries]);
 
   const volumeChart = useMemo(() => {
-    // last 8 weeks ISO-ish buckets
+    // last 8 weeks, local-day buckets (UTC slicing shifted bucket edges in IST)
     const weeks: { label: string; volume: number; sessions: number }[] = [];
     for (let i = 7; i >= 0; i--) {
-      const start = new Date(Date.now() - (i * 7 + 6) * 86_400_000);
-      const end = new Date(Date.now() - i * 7 * 86_400_000);
-      const startK = start.toISOString().slice(0, 10);
-      const endK = end.toISOString().slice(0, 10);
+      const start = new Date();
+      start.setDate(start.getDate() - (i * 7 + 6));
+      const end = new Date();
+      end.setDate(end.getDate() - i * 7);
+      const startK = dayKey(start);
+      const endK = dayKey(end);
       const inWeek = sessions.filter((s) => s.session_date >= startK && s.session_date <= endK);
       weeks.push({
         label: fmtDate(endK),
@@ -126,12 +129,15 @@ export default function Progress() {
         <Card>
           <div className="flex items-center justify-between">
             <h2 className="font-semibold">Body weight</h2>
-            {weightTrendKg != null && (
-              <Badge tone={weightTrendKg <= 0 ? "success" : "warning"}>
-                {weightTrendKg <= 0 ? <TrendingDown className="h-3.5 w-3.5" /> : <TrendingUp className="h-3.5 w-3.5" />}
-                {weightTrendKg > 0 ? "+" : ""}{weightTrendKg} kg / 4 wks
-              </Badge>
-            )}
+            {weightTrendKg != null && (() => {
+              const tone = trendTone(weightTrendKg, profile?.primary_goal);
+              return (
+                <Badge tone={tone === "good" ? "success" : tone === "bad" ? "warning" : "default"}>
+                  {weightTrendKg <= 0 ? <TrendingDown className="h-3.5 w-3.5" /> : <TrendingUp className="h-3.5 w-3.5" />}
+                  {weightTrendKg > 0 ? "+" : ""}{weightTrendKg} kg / 4 wks
+                </Badge>
+              );
+            })()}
           </div>
           {weightEntries.length >= 2 && weightChart.length >= 1 ? (
             <div className="mt-4 h-64">
@@ -271,14 +277,24 @@ export default function Progress() {
                       </button>
                       <button
                         onClick={async () => {
-                          if (window.confirm(`Delete the ${fmtDate(w.entry_date)} weigh-in (${w.weight_kg} kg)?`)) {
+                          if (confirmDeleteId === w.id) {
+                            setConfirmDeleteId(null);
                             await deleteWeight(w.id);
+                          } else {
+                            setConfirmDeleteId(w.id);
                           }
                         }}
-                        className="cursor-pointer rounded-lg p-1.5 text-ink-faint transition-colors hover:bg-surface-2 hover:text-danger"
-                        aria-label={`Delete weigh-in from ${fmtDate(w.entry_date)}`}
+                        onBlur={() => setConfirmDeleteId((id) => (id === w.id ? null : id))}
+                        className={cn(
+                          "cursor-pointer rounded-lg p-1.5 transition-colors",
+                          confirmDeleteId === w.id
+                            ? "bg-danger/15 text-danger"
+                            : "text-ink-faint hover:bg-surface-2 hover:text-danger"
+                        )}
+                        aria-label={confirmDeleteId === w.id ? `Confirm delete weigh-in from ${fmtDate(w.entry_date)}` : `Delete weigh-in from ${fmtDate(w.entry_date)}`}
+                        title={confirmDeleteId === w.id ? "Tap again to confirm" : "Delete"}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        {confirmDeleteId === w.id ? <span className="px-1 text-[12px] font-semibold">Sure?</span> : <Trash2 className="h-4 w-4" />}
                       </button>
                     </div>
                   </div>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { useProfile } from "../context/ProfileContext";
@@ -27,7 +27,7 @@ interface Draft {
 const DIET_OPTIONS = ["No restrictions", "Vegetarian", "Vegan", "Pescatarian", "Halal", "Kosher", "Lactose-free", "Gluten-free"];
 
 export default function Onboarding() {
-  const { profile, updateProfile, refresh } = useProfile();
+  const { profile, loading: profileLoading, updateProfile, refresh } = useProfile();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -46,6 +46,27 @@ export default function Onboarding() {
     weekly_workout_target: String(profile?.weekly_workout_target ?? 3),
     dietary_preferences: profile?.dietary_preferences ?? [],
   }));
+
+  // The profile may still be loading on first render — sync the draft once
+  // it arrives so returning users see their saved values, not blanks.
+  const syncedRef = useRef(false);
+  useEffect(() => {
+    if (profileLoading || syncedRef.current || !profile) return;
+    syncedRef.current = true;
+    setDraft({
+      display_name: profile.display_name ?? "",
+      age: profile.age ? String(profile.age) : "",
+      gender: (profile.gender as Gender | "") ?? "",
+      height_cm: profile.height_cm ? String(profile.height_cm) : "",
+      current_weight_kg: profile.current_weight_kg ? String(profile.current_weight_kg) : "",
+      target_weight_kg: profile.target_weight_kg ? String(profile.target_weight_kg) : "",
+      primary_goal: (profile.primary_goal as Goal | "") ?? "",
+      activity_level: (profile.activity_level as ActivityLevel | "") ?? "",
+      experience_level: (profile.experience_level as ExperienceLevel | "") ?? "",
+      weekly_workout_target: String(profile.weekly_workout_target ?? 3),
+      dietary_preferences: profile.dietary_preferences ?? [],
+    });
+  }, [profileLoading, profile]);
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((d) => ({ ...d, [key]: value }));
@@ -106,6 +127,19 @@ export default function Onboarding() {
     }
     await refresh();
     navigate("/app", { replace: true });
+  }
+
+  // Don't render the form until the profile has loaded — otherwise the
+  // draft initializes from null and returning users see blank fields.
+  if (profileLoading) {
+    return (
+      <div className="min-h-screen bg-surface-0 px-4 py-8">
+        <div className="mx-auto max-w-xl space-y-4">
+          <div className="skeleton h-8 w-40" />
+          <div className="skeleton h-64" />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -241,9 +275,17 @@ export default function Onboarding() {
                       <button
                         key={opt}
                         type="button"
-                        onClick={() =>
-                          set("dietary_preferences", selected ? draft.dietary_preferences.filter((d) => d !== opt) : [...draft.dietary_preferences, opt])
-                        }
+                        onClick={() => {
+                          // "No restrictions" is mutually exclusive with the rest.
+                          if (opt === "No restrictions") {
+                            set("dietary_preferences", selected ? [] : ["No restrictions"]);
+                          } else {
+                            const withoutNone = draft.dietary_preferences.filter(
+                              (d) => d !== "No restrictions" && d !== opt
+                            );
+                            set("dietary_preferences", selected ? withoutNone : [...withoutNone, opt]);
+                          }
+                        }}
                         className={cn(
                           "cursor-pointer rounded-full border px-3 py-1.5 text-[13px] transition-colors",
                           selected ? "border-accent bg-accent-soft text-ink" : "border-line text-ink-muted hover:bg-surface-2"

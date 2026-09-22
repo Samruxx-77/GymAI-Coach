@@ -11,12 +11,14 @@ import http from "node:http";
 import handleCoach from "../api/ai/coach.mjs";
 import handleFood from "../api/ai/food.mjs";
 import handleHealth from "../api/health.mjs";
+import handleAccountDelete from "../api/account/delete.mjs";
 
 const PORT = Number(process.env.API_PORT || 8787);
 
 const ROUTES = [
   { method: "POST", pattern: /^\/api\/ai\/coach\/?$/, handler: handleCoach },
   { method: "POST", pattern: /^\/api\/ai\/food\/?$/, handler: handleFood },
+  { method: "POST", pattern: /^\/api\/account\/delete\/?$/, handler: handleAccountDelete },
   { method: "GET", pattern: /^\/api\/health\/?$/, handler: handleHealth },
 ];
 
@@ -26,9 +28,10 @@ function readBody(req) {
     const chunks = [];
     req.on("data", (chunk) => {
       size += chunk.length;
-      // Reject oversized uploads early (images are downscaled client-side
-      // to <= 768px JPEG, which lands well under this ceiling).
-      if (size > 12 * 1024 * 1024) {
+      // Reject oversized uploads early. The server-side food cap is 500 KB
+      // base64; a 1 MB body ceiling leaves room for JSON overhead while
+      // keeping memory use bounded.
+      if (size > 1024 * 1024) {
         reject(new Error("Payload too large"));
         req.destroy();
         return;
@@ -90,6 +93,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(`[api] dev server listening on http://0.0.0.0:${PORT}`);
+// Bind to loopback only — this is a local dev helper, not a network service.
+server.listen(PORT, "127.0.0.1", () => {
+  console.log(`[api] dev server listening on http://127.0.0.1:${PORT}`);
 });

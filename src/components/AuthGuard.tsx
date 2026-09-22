@@ -14,6 +14,18 @@ export function AuthGate() {
 }
 
 /**
+ * Allow only internal destinations. A raw ?returnTo=/ ?next= value could
+ * point at an attacker site (open redirect); anything that isn't a
+ * same-origin absolute path falls back to /app.
+ */
+export function safeRedirect(raw: string | null | undefined): string {
+  if (typeof raw !== "string" || !raw.startsWith("/") || raw.startsWith("//") || raw.startsWith("/\\")) {
+    return "/app";
+  }
+  return raw;
+}
+
+/**
  * Redirects signed-in users away from a public page (auth, landing)
  * to the app. Honors ?returnTo= / ?next= as the destination.
  */
@@ -23,7 +35,7 @@ export function RedirectIfAuthed({ children }: { children: React.ReactNode }) {
   if (loading) return <AuthGate />;
   if (session) {
     const params = new URLSearchParams(location.search);
-    const dest = params.get("next") ?? params.get("returnTo") ?? "/app";
+    const dest = safeRedirect(params.get("next") ?? params.get("returnTo"));
     return <Navigate to={dest} replace />;
   }
   return <>{children}</>;

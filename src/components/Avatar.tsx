@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { cn } from "../lib/utils";
 
 export interface AvatarDef {
@@ -56,6 +56,11 @@ export function Avatar({ avatarId, name, className, showMark = true }: AvatarPro
 
   const isUploadUrl = !def && avatarId != null && /^https?:\/\//i.test(avatarId);
   const [imgFailed, setImgFailed] = useState(false);
+  // Reset the failure state when the URL changes — otherwise a new photo
+  // would keep showing the initials fallback from a previous failure.
+  useEffect(() => {
+    setImgFailed(false);
+  }, [avatarId]);
   if (isUploadUrl && !imgFailed) {
     // Uploaded profile photo: render the image directly; fall back to
     // initials if the image fails to load (e.g. deleted from storage).

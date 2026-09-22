@@ -1,10 +1,38 @@
 -- ═══════════════════════════════════════════════════════════════════
 -- GymAI Coach — database schema
--- Run this ONCE in Supabase → SQL Editor → Run.
+-- Run in Supabase → SQL Editor → Run.
 -- Idempotent: safe to re-run (IF NOT EXISTS / OR REPLACE / ON CONFLICT).
+-- The MIGRATIONS section below also repairs databases created from
+-- older versions of this file (missing columns, old constraints).
 -- ═══════════════════════════════════════════════════════════════════
 
 create extension if not exists pgcrypto;
+
+-- ═══════════════════════════════════════════════════════════════════
+-- MIGRATIONS — repair older databases (all idempotent, safe to re-run)
+-- ═══════════════════════════════════════════════════════════════════
+
+-- Custom exercises (2026-09-22): older DBs lack public.exercises.user_id
+-- and still carry the old global unique name constraint + unwritable RLS.
+alter table public.exercises
+  add column if not exists user_id uuid references auth.users(id) on delete cascade;
+-- Drop the legacy global unique-name constraint if it survived (default PG name).
+alter table public.exercises drop constraint if exists exercises_name_key;
+
+-- Custom-exercise delete safety: deleting an exercise must not orphan
+-- workout_exercises rows (deleting a referenced exercise used to 500).
+do $$
+begin
+  if exists (
+    select 1 from pg_constraint
+    where conname = 'workout_exercises_exercise_id_fkey' and confdeltype <> 'c'
+  ) then
+    alter table public.workout_exercises drop constraint workout_exercises_exercise_id_fkey;
+    alter table public.workout_exercises
+      add constraint workout_exercises_exercise_id_fkey
+      foreign key (exercise_id) references public.exercises(id) on delete cascade;
+  end if;
+end $$;
 
 -- ── helpers ────────────────────────────────────────────────────────
 create or replace function public.set_updated_at()
@@ -58,7 +86,16 @@ create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
   insert into public.profiles (id, email, display_name)
-  values (new.id, new.email, coalesce(new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1)))
+  values (
+    new.id,
+    new.email,
+    coalesce(
+      nullif(new.raw_user_meta_data->>'display_name', ''),
+      split_part(new.email, '@', 1),  -- null when signed up by phone
+      new.phone,                       -- phone-auth users: use the number
+      'Member'
+    )
+  )
   on conflict (id) do nothing;
   return new;
 end $$;
@@ -116,6 +153,8 @@ create unique index if not exists exercises_system_name_unique
   on public.exercises (name) where user_id is null;
 create unique index if not exists exercises_user_name_unique
   on public.exercises (user_id, name) where user_id is not null;
+-- lookup index for "my exercises" queries (used by createExercise / library)
+create index if not exists exercises_user_lookup on public.exercises (user_id);
 
 -- ── 5. WORKOUTS (templates: system + user-created) ─────────────────
 create table if not exists public.workouts (
@@ -138,7 +177,7 @@ create trigger workouts_updated_at before update on public.workouts
 create table if not exists public.workout_exercises (
   id            uuid primary key default gen_random_uuid(),
   workout_id    uuid not null references public.workouts(id) on delete cascade,
-  exercise_id   uuid not null references public.exercises(id),
+  exercise_id   uuid not null references public.exercises(id) on delete cascade,
   position      integer not null default 0,
   sets          integer not null default 3 check (sets between 1 and 20),
   reps          text not null default '10',
@@ -146,6 +185,7 @@ create table if not exists public.workout_exercises (
   notes         text not null default ''
 );
 create index if not exists workout_exercises_workout on public.workout_exercises (workout_id, position);
+create index if not exists workout_exercises_exercise on public.workout_exercises (exercise_id);
 
 -- ── 7. WORKOUT SESSIONS (completions) ──────────────────────────────
 create table if not exists public.workout_sessions (
@@ -163,6 +203,7 @@ create table if not exists public.workout_sessions (
   created_at          timestamptz not null default now()
 );
 create index if not exists workout_sessions_user_date on public.workout_sessions (user_id, session_date desc);
+create index if not exists workout_sessions_workout on public.workout_sessions (workout_id);
 
 -- ── 8. XP EVENTS (append-only ledger — source of truth) ────────────
 create table if not exists public.xp_events (
@@ -206,6 +247,52 @@ drop trigger if exists xp_enforce_points on public.xp_events;
 create trigger xp_enforce_points before insert on public.xp_events
   for each row execute function public.enforce_xp_points();
 
+-- freeze points on UPDATE: clients can never change awarded XP afterwards.
+-- (RLS allows owners to update their rows for other reasons; points stay fixed.)
+create or replace function public.freeze_xp_points()
+returns trigger language plpgsql as $$
+begin
+  new.points := old.points;
+  return new;
+end $$;
+
+drop trigger if exists xp_freeze_points on public.xp_events;
+create trigger xp_freeze_points before update on public.xp_events
+  for each row execute function public.freeze_xp_points();
+
+-- anti-farming: sources that carry a ref_id must reference a real row.
+-- (Today only workout_complete uses ref_ids — workout_sessions ids.)
+create or replace function public.verify_xp_ref()
+returns trigger language plpgsql as $$
+begin
+  if new.source = 'workout_complete' and new.ref_id is not null then
+    if not exists (
+      select 1 from public.workout_sessions
+      where id = new.ref_id::uuid and user_id = new.user_id
+    ) then
+      raise exception 'xp_events: ref_id does not reference a real workout session';
+    end if;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists xp_verify_ref on public.xp_events;
+create trigger xp_verify_ref before insert on public.xp_events
+  for each row execute function public.verify_xp_ref();
+
+-- ── 8b. AI USAGE (append-only ledger — persistent per-user daily AI quota)
+-- The server records one row per AI endpoint call (with the number of
+-- provider requests it spent). No UPDATE/DELETE policies: append-only.
+create table if not exists public.ai_usage (
+  id             uuid primary key default gen_random_uuid(),
+  user_id        uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  day            date not null default current_date,
+  endpoint       text not null check (endpoint in ('coach','food')),
+  provider_calls integer not null default 1 check (provider_calls between 1 and 20),
+  created_at     timestamptz not null default now()
+);
+create index if not exists ai_usage_user_day on public.ai_usage (user_id, day desc);
+
 -- ── 9. ACHIEVEMENTS ────────────────────────────────────────────────
 create table if not exists public.achievements (
   id          text primary key,          -- slug
@@ -248,6 +335,7 @@ create table if not exists public.ai_messages (
   created_at      timestamptz not null default now()
 );
 create index if not exists ai_messages_conversation on public.ai_messages (conversation_id, created_at);
+create index if not exists ai_conversations_user_updated on public.ai_conversations (user_id, updated_at desc);
 
 -- ═══════════════════════════════════════════════════════════════════
 -- ROW LEVEL SECURITY — member data is isolated to auth.uid()
@@ -265,6 +353,7 @@ alter table public.achievements       enable row level security;
 alter table public.user_achievements  enable row level security;
 alter table public.ai_conversations   enable row level security;
 alter table public.ai_messages        enable row level security;
+alter table public.ai_usage            enable row level security;
 
 -- profiles
 drop policy if exists "own profile" on public.profiles;
@@ -281,6 +370,15 @@ begin
     execute format('create policy "owner all" on public.%I for all using (auth.uid() = user_id) with check (auth.uid() = user_id)', t);
   end loop;
 end $$;
+
+-- ai_usage: append-only ledger. Users can read and insert their own
+-- rows (the server writes with the caller's token); no UPDATE/DELETE.
+drop policy if exists "ai_usage read own" on public.ai_usage;
+create policy "ai_usage read own" on public.ai_usage
+  for select using (auth.uid() = user_id);
+drop policy if exists "ai_usage insert own" on public.ai_usage;
+create policy "ai_usage insert own" on public.ai_usage
+  for insert with check (auth.uid() = user_id);
 
 -- exercises: system seed data readable by all; users can manage only their own rows
 drop policy if exists "public read" on public.exercises;
@@ -373,7 +471,7 @@ insert into public.exercises (name, muscle_group, equipment, is_compound, instru
   ('Farmer Carry','full_body','dumbbell',true,'Carry heavy dumbbells at your sides for distance or time with a tall posture.','Grip strength and core bracing are the limiting factors — stay tall.'),
   ('Goblet Squat','legs','kettlebell',true,'Hold a kettlebell at chest height and squat until thighs reach parallel, then drive up.','Keep elbows inside your knees at the bottom and chest tall.'),
   ('Dumbbell Row','back','dumbbell',true,'Brace one hand on a bench and row the dumbbell toward your hip with the other.','Let the shoulder blade move naturally; avoid twisting the torso.')
-on conflict (name) do nothing;
+on conflict (name) where user_id is null do nothing;
 
 -- ═══════════════════════════════════════════════════════════════════
 -- SEED: ACHIEVEMENTS
@@ -412,25 +510,33 @@ declare
   w_push uuid; w_pull uuid; w_legs uuid; w_full uuid; w_upper uuid; w_lower uuid;
   e uuid;
 begin
-  -- Push Day
+  -- Idempotent template headers: insert only when the fixed id is missing,
+  -- then resolve the id either way (plain re-run of this file is safe).
   insert into public.workouts (id, user_id, name, description, category, difficulty, estimated_minutes)
     values ('11111111-1111-4111-8111-111111111111', null, 'Push Day', 'Chest, shoulders and triceps — the classic pressing day.', 'push', 'intermediate', 55)
-    returning id into w_push;
+    on conflict (id) do nothing;
   insert into public.workouts (id, user_id, name, description, category, difficulty, estimated_minutes)
     values ('11111111-1111-4111-8111-111111111112', null, 'Pull Day', 'Back and biceps — rows, pulldowns and curls.', 'pull', 'intermediate', 55)
-    returning id into w_pull;
+    on conflict (id) do nothing;
   insert into public.workouts (id, user_id, name, description, category, difficulty, estimated_minutes)
     values ('11111111-1111-4111-8111-111111111113', null, 'Leg Day', 'Squats, hinges and everything in between.', 'legs', 'intermediate', 60)
-    returning id into w_legs;
+    on conflict (id) do nothing;
   insert into public.workouts (id, user_id, name, description, category, difficulty, estimated_minutes)
     values ('11111111-1111-4111-8111-111111111114', null, 'Full Body Starter', 'A balanced beginner session hitting the whole body.', 'full_body', 'beginner', 45)
-    returning id into w_full;
+    on conflict (id) do nothing;
   insert into public.workouts (id, user_id, name, description, category, difficulty, estimated_minutes)
     values ('11111111-1111-4111-8111-111111111115', null, 'Upper Body Power', 'Heavy compound pressing and pulling for the upper body.', 'upper', 'advanced', 60)
-    returning id into w_upper;
+    on conflict (id) do nothing;
   insert into public.workouts (id, user_id, name, description, category, difficulty, estimated_minutes)
     values ('11111111-1111-4111-8111-111111111116', null, 'Lower Body Strength', 'Squat-focused strength work for the lower body.', 'lower', 'advanced', 60)
-    returning id into w_lower;
+    on conflict (id) do nothing;
+
+  select id into w_push  from public.workouts where id = '11111111-1111-4111-8111-111111111111';
+  select id into w_pull  from public.workouts where id = '11111111-1111-4111-8111-111111111112';
+  select id into w_legs  from public.workouts where id = '11111111-1111-4111-8111-111111111113';
+  select id into w_full  from public.workouts where id = '11111111-1111-4111-8111-111111111114';
+  select id into w_upper from public.workouts where id = '11111111-1111-4111-8111-111111111115';
+  select id into w_lower from public.workouts where id = '11111111-1111-4111-8111-111111111116';
 
   -- Push exercises
   insert into public.workout_exercises (workout_id, exercise_id, position, sets, reps, rest_seconds)
@@ -442,7 +548,7 @@ begin
     ('Triceps Rope Pushdown', 4, 3, '12-15', 60),
     ('Overhead Triceps Extension', 5, 2, '12', 60)
   ) as t(name, position, sets, reps, rest)
-  join public.exercises e on e.name = t.name
+  join public.exercises e on e.name = t.name and e.user_id is null
   where not exists (select 1 from public.workout_exercises we where we.workout_id = w_push);
 
   -- Pull exercises
@@ -456,7 +562,7 @@ begin
     ('Barbell Curl', 5, 3, '10-12', 60),
     ('Dumbbell Hammer Curl', 6, 2, '12', 60)
   ) as t(name, position, sets, reps, rest)
-  join public.exercises e on e.name = t.name
+  join public.exercises e on e.name = t.name and e.user_id is null
   where not exists (select 1 from public.workout_exercises we where we.workout_id = w_pull);
 
   -- Legs exercises
@@ -469,7 +575,7 @@ begin
     ('Leg Curl', 4, 3, '12', 60),
     ('Standing Calf Raise', 5, 4, '15', 60)
   ) as t(name, position, sets, reps, rest)
-  join public.exercises e on e.name = t.name
+  join public.exercises e on e.name = t.name and e.user_id is null
   where not exists (select 1 from public.workout_exercises we where we.workout_id = w_legs);
 
   -- Full body starter
@@ -481,7 +587,7 @@ begin
     ('Overhead Press', 3, 2, '10', 90),
     ('Plank', 4, 3, '30-45s', 60)
   ) as t(name, position, sets, reps, rest)
-  join public.exercises e on e.name = t.name
+  join public.exercises e on e.name = t.name and e.user_id is null
   where not exists (select 1 from public.workout_exercises we where we.workout_id = w_full);
 
   -- Upper body power
@@ -494,7 +600,7 @@ begin
     ('Barbell Curl', 4, 3, '10', 60),
     ('Skull Crusher', 5, 3, '10', 60)
   ) as t(name, position, sets, reps, rest)
-  join public.exercises e on e.name = t.name
+  join public.exercises e on e.name = t.name and e.user_id is null
   where not exists (select 1 from public.workout_exercises we where we.workout_id = w_upper);
 
   -- Lower body strength
@@ -507,7 +613,7 @@ begin
     ('Leg Extension', 4, 3, '12', 90),
     ('Standing Calf Raise', 5, 4, '12', 60)
   ) as t(name, position, sets, reps, rest)
-  join public.exercises e on e.name = t.name
+  join public.exercises e on e.name = t.name and e.user_id is null
   where not exists (select 1 from public.workout_exercises we where we.workout_id = w_lower);
 end $$;
 

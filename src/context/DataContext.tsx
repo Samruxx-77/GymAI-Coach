@@ -23,7 +23,7 @@ import type {
   WorkoutCategory,
   WorkoutSession,
 } from "../lib/types";
-import { todayKey } from "../lib/utils";
+import { todayKey, yesterdayKey, dayKey } from "../lib/utils";
 import { useProfile } from "./ProfileContext";
 import { XP_VALUES, type AchievementStats } from "../lib/gamification";
 import { checkAndUnlockAchievements } from "../lib/xpUser";
@@ -240,12 +240,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const awardXp = useCallback(
     async (source: keyof typeof XP_VALUES, refId: string | null) => {
       if (!user || !supabaseConfigured) return;
-      await supabase
+      // Plain insert: the partial unique indexes in the schema enforce
+      // idempotency server-side (23505 on duplicates). The old upsert with
+      // onConflict could never match a partial index (Postgres 42P10), so
+      // daily XP was silently never awarded.
+      const { error } = await supabase
         .from("xp_events")
-        .upsert(
-          { user_id: user.id, source, ref_id: refId, day: todayKey() },
-          { onConflict: "user_id,source,ref_id,day", ignoreDuplicates: true }
-        );
+        .insert({ user_id: user.id, source, ref_id: refId, day: todayKey() });
+      if (error && error.code !== "23505") {
+        console.error("awardXp failed:", error.message);
+      }
       // Keep profiles.xp (the cached total the UI reads) in sync.
       await recomputeXpCache(user.id);
       await fetchAll();
@@ -283,12 +287,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
         .update({ weight_kg: kg, note })
         .eq("id", id);
       if (err) return { error: err.message };
-      // If this is today's row, keep the profile cache in sync.
-      const row = weightEntries.find((w) => w.id === id);
-      if (row && row.entry_date === todayKey() && profile) {
-        await updateProfile({ current_weight_kg: kg });
-      }
       await fetchAll();
+      // Resync the profile cache from the newest remaining entry — editing
+      // any row (not just today's) can change which entry is latest.
+      if (profile) {
+        const updated = weightEntries.map((w) => (w.id === id ? { ...w, weight_kg: kg, note } : w));
+        const latest = updated.length ? updated[0].weight_kg : null;
+        if (profile.current_weight_kg !== latest) {
+          await updateProfile({ current_weight_kg: latest });
+        }
+      }
       return { error: null };
     },
     [weightEntries, profile, updateProfile, fetchAll]
@@ -299,25 +307,43 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const { error: err } = await supabase.from("weight_entries").delete().eq("id", id);
       if (err) return { error: err.message };
       await fetchAll();
+      // If the deleted row was the latest, the profile weight cache would
+      // go stale — resync it from the newest remaining entry (or clear it).
+      if (profile) {
+        const remaining = weightEntries.filter((w) => w.id !== id);
+        const latest = remaining.length ? remaining[0].weight_kg : null;
+        if (profile.current_weight_kg !== latest) {
+          await updateProfile({ current_weight_kg: latest });
+        }
+      }
       return { error: null };
     },
-    [fetchAll]
+    [fetchAll, profile, updateProfile, weightEntries]
   );
 
   const addFood = useCallback(
     async (input: NewFoodInput) => {
-      const { error: err } = await supabase.from("food_entries").insert(input);
+      if (!user) return { error: "Not signed in" };
+      // Explicit user_id: never rely on the column default (which is
+      // auth.uid() and NULL for service-role inserts).
+      const { error: err } = await supabase
+        .from("food_entries")
+        .insert({ ...input, user_id: user.id });
       if (err) return { error: err.message };
       await awardXp("food_log", null);
       return { error: null };
     },
-    [awardXp]
+    [user, awardXp]
   );
 
-  const deleteFood = useCallback(async (id: string) => {
-    const { error: err } = await supabase.from("food_entries").delete().eq("id", id);
-    return { error: err ? err.message : null };
-  }, []);
+  const deleteFood = useCallback(
+    async (id: string) => {
+      const { error: err } = await supabase.from("food_entries").delete().eq("id", id);
+      if (!err) await fetchAll(); // keep the diary list + macro totals in sync
+      return { error: err ? err.message : null };
+    },
+    [fetchAll]
+  );
 
   const saveWorkout = useCallback(
     async (input: WorkoutInput, lineItems: LineItemInput[]) => {
@@ -375,9 +401,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         .single();
       if (err) return { error: err.message };
       await awardXp("workout_complete", data.id);
-      // streak update: set last_active_date + increment if consecutive
+      // streak update: set last_active_date + increment if consecutive.
+      // Both dates are LOCAL day keys — the old code used a UTC "yesterday",
+      // which broke streaks for ~half the day in IST.
       const today = todayKey();
-      const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+      const yesterday = yesterdayKey();
       if (profile) {
         const last = profile.last_active_date;
         let streak = profile.streak_count;
@@ -431,7 +459,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [weightEntries]);
 
   const weekWorkoutCount = useMemo(() => {
-    const cutoff = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+    // Rolling 7-day window in LOCAL time: today + the 6 days before it.
+    // (The old UTC-based cutoff could span 8 calendar dates in IST.)
+    const d = new Date();
+    d.setDate(d.getDate() - 6);
+    const cutoff = dayKey(d);
     return sessions.filter((s) => s.session_date >= cutoff).length;
   }, [sessions]);
 

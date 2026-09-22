@@ -8,7 +8,7 @@ import { useData } from "../context/DataContext";
 import { useProfile } from "../context/ProfileContext";
 import { supabase } from "../lib/supabase";
 import { recomputeXpCache } from "../lib/xp";
-import { cn } from "../lib/utils";
+import { cn, todayKey } from "../lib/utils";
 
 const SUGGESTIONS = [
   "How's my progress looking this month?",
@@ -132,13 +132,15 @@ function CoachInner() {
             await supabase.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", convId);
           }
           // ai_chat XP: once per day via daily dedupe; keep the cached
-          // total in sync like every other award path.
-          await supabase
+          // total in sync like every other award path. Plain insert — the
+          // schema's partial unique index enforces idempotency (23505 =
+          // already awarded today, safe to ignore).
+          const { error: xpErr } = await supabase
             .from("xp_events")
-            .upsert(
-              { user_id: auth.user.id, source: "ai_chat", ref_id: null, day: new Date().toISOString().slice(0, 10) },
-              { onConflict: "user_id,source,day", ignoreDuplicates: true }
-            );
+            .insert({ user_id: auth.user.id, source: "ai_chat", ref_id: null, day: todayKey() });
+          if (xpErr && xpErr.code !== "23505") {
+            console.error("ai_chat XP failed:", xpErr.message);
+          }
           await recomputeXpCache(auth.user.id);
         }
       } catch (err) {
@@ -150,14 +152,30 @@ function CoachInner() {
     [messages, sending, context, conversationId]
   );
 
+  // Two-step clear: first click arms, second click confirms. Delete
+  // failures surface an error instead of silently wiping local state.
+  const [confirmingClear, setConfirmingClear] = useState(false);
+  const [clearError, setClearError] = useState<string | null>(null);
+
   async function clearChat() {
+    if (!confirmingClear) {
+      setConfirmingClear(true);
+      return;
+    }
+    setConfirmingClear(false);
+    setClearError(null);
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) return;
-    if (conversationId) {
-      await supabase.from("ai_conversations").delete().eq("id", conversationId);
+    try {
+      if (conversationId) {
+        const { error } = await supabase.from("ai_conversations").delete().eq("id", conversationId);
+        if (error) throw error;
+      }
+      setConversationId(null);
+      setMessages([]);
+    } catch (err) {
+      setClearError(err instanceof Error ? err.message : "Could not clear the conversation.");
     }
-    setConversationId(null);
-    setMessages([]);
   }
 
   return (
@@ -167,9 +185,19 @@ function CoachInner() {
           <h1 className="display text-2xl font-bold">AI Coach</h1>
           <p className="text-[13px] text-ink-muted">Knows your goal, targets, streak and recent training.</p>
         </div>
-        <Button variant="ghost" size="sm" onClick={clearChat} aria-label="Clear conversation">
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-2">
+          {clearError && <p className="text-[12px] text-danger">{clearError}</p>}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearChat}
+            onBlur={() => setConfirmingClear(false)}
+            aria-label={confirmingClear ? "Confirm clear conversation" : "Clear conversation"}
+            className={confirmingClear ? "text-danger" : undefined}
+          >
+            {confirmingClear ? "Sure?" : <Trash2 className="h-4 w-4" />}
+          </Button>
+        </div>
       </div>
 
       {/* messages */}

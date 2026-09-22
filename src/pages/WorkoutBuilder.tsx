@@ -115,15 +115,30 @@ export default function WorkoutBuilder() {
     if (!name.trim()) return setError("Give the workout a name.");
     if (!lines.length) return setError("Add at least one exercise.");
     setBusy(true);
-    // If editing, replace: delete then recreate (simple + safe under RLS).
-    if (editing) await deleteWorkout(editing.id);
-    const { error } = await saveWorkout(
+    // If editing, create the replacement FIRST and only delete the
+    // original after it saved — deleting first meant a failed save
+    // permanently lost the workout.
+    const { error, id } = await saveWorkout(
       { name: name.trim(), description, category, difficulty, estimated_minutes: minutes },
       lines.map((l, i) => ({ ...l, position: i }))
     );
+    if (error || !id) {
+      setBusy(false);
+      setError(error ?? "Could not save the workout. Your original was kept.");
+      return;
+    }
+    if (editing && editing.id !== id) {
+      const { error: delErr } = await deleteWorkout(editing.id);
+      if (delErr) {
+        // Replacement saved but the old copy survived — surface it so the
+        // user can clean up manually; nothing was lost.
+        setBusy(false);
+        setError(`Saved, but the old copy could not be removed: ${delErr}`);
+        return;
+      }
+    }
     setBusy(false);
-    if (error) setError(error);
-    else navigate("/app/workouts", { replace: true });
+    navigate("/app/workouts", { replace: true });
   }
 
   const estMinutes = useMemo(
