@@ -170,15 +170,10 @@ export default function Nutrition() {
                 }`}
               >
                 {t === "scan" && <ScanLine className="h-4 w-4" />}
-                {t === "diary" ? "Diary" : "Scan"}
+                {t === "diary" ? "Diary" : "Scan Your Food"}
               </button>
             ))}
           </div>
-          {tab === "diary" && (
-            <Button onClick={() => setOpen((o) => !o)}>
-              <Plus className="h-4 w-4" /> Add food
-            </Button>
-          )}
         </div>
       </div>
 
@@ -311,6 +306,9 @@ export default function Nutrition() {
             </button>
           ))}
         </div>
+        <Button variant="secondary" size="sm" className="mt-3" onClick={() => setOpen((o) => !o)}>
+          <Plus className="h-4 w-4" /> Add food manually
+        </Button>
       </Card>
 
       {/* Empty-day AI suggestions */}
