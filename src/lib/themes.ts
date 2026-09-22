@@ -1,4 +1,4 @@
-export type ThemeId = "midnight" | "ocean" | "sunset" | "forest";
+export type ThemeId = "midnight" | "ocean" | "sunset" | "forest" | "cream" | "light";
 
 export interface ThemeDef {
   id: ThemeId;
@@ -92,6 +92,38 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
     accentSoft: "#10b98120",
     glow: "#2dd4bf",
     hue: 160,
+  },
+  cream: {
+    id: "cream",
+    name: "Cream",
+    tagline: "Smooth vanilla",
+    surfaces: ["#faf6ec", "#f4edda", "#e9dfc6", "#ded2b4"],
+    line: "#e2d5b8",
+    ink: "#3d3428",
+    inkMuted: "#7a6e58",
+    inkFaint: "#a89a7d",
+    accent300: "#f0b26b",
+    accent: "#d97e26",
+    accentStrong: "#c2671a",
+    accentSoft: "#d97e261f",
+    glow: "#e8a54b",
+    hue: 38,
+  },
+  light: {
+    id: "light",
+    name: "Light",
+    tagline: "Clean daylight",
+    surfaces: ["#f8fafc", "#f1f5f9", "#e2e8f0", "#cbd5e1"],
+    line: "#e2e8f0",
+    ink: "#0f172a",
+    inkMuted: "#64748b",
+    inkFaint: "#94a3b8",
+    accent300: "#60a5fa",
+    accent: "#2563eb",
+    accentStrong: "#1d4ed8",
+    accentSoft: "#2563eb1a",
+    glow: "#38bdf8",
+    hue: 220,
   },
 };
 
