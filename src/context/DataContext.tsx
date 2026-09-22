@@ -174,7 +174,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         supabase.from("weight_entries").select("*").order("entry_date", { ascending: false }),
         supabase.from("food_entries").select("*").order("entry_date", { ascending: false }).limit(400),
         supabase.from("exercises").select("*").order("name"),
-        supabase.from("workouts").select("*, workout_exercises(*)").order("updated_at", { ascending: false }),
+        supabase.from("workouts").select("*, workout_exercises(*, exercises(*))").order("updated_at", { ascending: false }),
         supabase.from("workout_sessions").select("*").order("session_date", { ascending: false }).limit(200),
         supabase.from("xp_events").select("*").order("created_at", { ascending: false }).limit(500),
         supabase.from("achievements").select("*").order("sort_order"),
