@@ -255,14 +255,14 @@ export default function ProfileSettings() {
 
       {/* ── Avatar picker ─────────────────────────────────────────── */}
       <Card>
-        <h2 className="font-semibold">Avatar</h2>
+        <h2 className="font-bold">Avatar</h2>
         <p className="mt-1 text-[13px] text-ink-muted">
           Upload your own photo or pick a mark. Shown beside your name across the app.
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Button
             type="button"
-            variant="secondary"
+            variant="primary"
             size="sm"
             loading={uploadingAvatar}
             onClick={() => avatarInputRef.current?.click()}
