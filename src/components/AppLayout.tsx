@@ -133,7 +133,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Mobile top bar */}
-      <header className="theme-glass fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-line px-4 py-3 lg:hidden">
+      <header className="fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-line bg-surface-0 px-4 py-3 lg:hidden">
         <Logo compact />
         <button className="flex cursor-pointer items-center gap-3 text-[13px]" onClick={() => navigate("/app/profile")}>
           <span className="flex items-center gap-1 font-semibold">
@@ -160,7 +160,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Mobile bottom nav — five in-bar tabs */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-line bg-surface-0/95 pt-1 pb-[max(env(safe-area-inset-bottom),4px)] backdrop-blur lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-line bg-surface-0 pt-1 pb-[max(env(safe-area-inset-bottom),4px)] lg:hidden">
         <BottomItem to="/app" label="Home" icon={Activity} end />
         <BottomItem to="/app/nutrition" label="Food Entry" icon={ChefHat} />
         <BottomItem to="/app/workouts" label="Workouts" icon={Dumbbell} />

@@ -164,7 +164,7 @@ function AuthForm({ mode, setMode }: { mode: Mode; setMode: (m: Mode) => void })
 export default function Auth() {
   const [mode, setMode] = useMode();
   return (
-    <div className="flex min-h-screen bg-surface-0">
+    <div className="page-fade flex min-h-screen bg-surface-0">
       {/* Left: brand panel over the gym scene */}
       <div className="relative hidden flex-1 flex-col justify-between overflow-hidden border-r border-line p-10 lg:flex">
         {/* gym photograph backdrop, fading into the surface */}

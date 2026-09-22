@@ -62,7 +62,7 @@ function TiltCard({ children }: { children: React.ReactNode }) {
       ref={ref}
       onPointerMove={onMove}
       onPointerLeave={() => setTilt({ rx: 0, ry: 0 })}
-      className="card card-hover p-5 will-change-transform"
+      className="card card-hover p-5"
       style={{
         transform: `perspective(720px) rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg)`,
         transition: tilt.rx === 0 && tilt.ry === 0 ? "transform 400ms ease" : "transform 80ms ease-out",
@@ -79,9 +79,9 @@ export default function Landing() {
   const primary = { to: user ? "/app" : "/auth", label: user ? "Open app" : "Start free" };
 
   return (
-    <div className="min-h-screen bg-surface-0 text-ink">
+    <div className="page-fade min-h-screen bg-surface-0 text-ink">
       {/* Nav */}
-      <header className="theme-glass sticky top-0 z-40 border-b border-line/60">
+      <header className="sticky top-0 z-40 border-b border-line/60 bg-surface-0">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3.5">
           <Logo />
           <div className="flex items-center gap-2">
