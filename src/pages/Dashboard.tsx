@@ -2,13 +2,13 @@ import { useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight, CheckCircle2, Flame, LineChart as LineChartIcon, MessageCircle,
-  ScanLine, Sparkles, Target, Zap, Dumbbell, Scale,
+  ScanLine, Target, Dumbbell, Scale,
 } from "lucide-react";
 import { Card, Badge, ProgressBar, Button } from "../components/ui";
+import ThemeDots from "../components/ThemeDots";
 import { useData } from "../context/DataContext";
 import { useProfile } from "../context/ProfileContext";
 import { useAuth } from "../context/AuthContext";
-import { rankForXp } from "../lib/gamification";
 import { dailyInsight, todayMission } from "../lib/insights";
 import { goalLabel } from "../lib/nutrition";
 import { formatNumber, goalProgressPercent, todayKey } from "../lib/utils";
@@ -22,8 +22,6 @@ export default function Dashboard() {
     today, latestWeight, weightTrendKg, weekWorkoutCount, workoutDoneToday,
     xpEvents, loading,
   } = useData();
-
-  const rank = rankForXp(profile?.xp ?? 0);
 
   /* ── daily login XP (once per day, server-enforced) ─────────── */
   // Badge evaluation runs centrally in DataContext after every data
@@ -95,16 +93,13 @@ export default function Dashboard() {
 
   return (
     <div className="page-fade space-y-5">
-      {/* Greeting + streak/XP */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      {/* Greeting + theme switcher */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-[13px] text-ink-faint">{greeting},</p>
           <h1 className="display text-2xl font-bold text-ink">{profile.display_name}</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge tone="warning"><Flame className="h-3.5 w-3.5" /> {profile.streak_count}-day streak</Badge>
-          <Badge tone="accent"><Zap className="h-3.5 w-3.5" /> {formatNumber(profile.xp)} XP · {rank.current.name}</Badge>
-        </div>
+        <ThemeDots />
       </div>
 
       {/* Mission + insight */}
@@ -200,7 +195,7 @@ export default function Dashboard() {
       {/* Quick actions */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
-          { to: "/app/scan", icon: ScanLine, label: "Scan food" },
+          { to: "/app/nutrition?mode=scan", icon: ScanLine, label: "Scan food" },
           { to: "/app/nutrition", icon: Scale, label: "Log meal" },
           { to: "/app/workouts", icon: Dumbbell, label: "Workout" },
           { to: "/app/progress", icon: LineChartIcon, label: "Weigh in" },
@@ -213,22 +208,6 @@ export default function Dashboard() {
           </Link>
         ))}
       </div>
-
-      {/* XP progress to next rank */}
-      <Card>
-        <div className="flex items-center justify-between text-[13px]">
-          <span className="flex items-center gap-1.5 font-medium text-ink">
-            <Sparkles className="h-4 w-4 text-accent-300" /> Rank progress
-          </span>
-          <span className="text-ink-muted tnum">
-            {formatNumber(profile.xp)} / {rank.next ? formatNumber(rank.next.minXp) : "MAX"} XP
-          </span>
-        </div>
-        <ProgressBar className="mt-3" value={rank.progress} />
-        <p className="mt-2 text-[12px] text-ink-faint">
-          {rank.next ? `${formatNumber(rank.next.minXp - profile.xp)} XP to ${rank.next.name}` : "Top rank achieved — Immortal"}
-        </p>
-      </Card>
     </div>
   );
 }
