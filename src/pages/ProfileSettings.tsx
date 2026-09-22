@@ -253,6 +253,57 @@ export default function ProfileSettings() {
         </div>
       </Card>
 
+      {/* ── Avatar picker ─────────────────────────────────────────── */}
+      <Card>
+        <h2 className="font-semibold">Avatar</h2>
+        <p className="mt-1 text-[13px] text-ink-muted">
+          Upload your own photo or pick a mark. Shown beside your name across the app.
+        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            loading={uploadingAvatar}
+            onClick={() => avatarInputRef.current?.click()}
+          >
+            {uploadingAvatar ? "Uploading…" : "Upload photo"}
+          </Button>
+          <span className="text-[12px] text-ink-muted">JPG, PNG, WebP or GIF · under 2 MB</span>
+        </div>
+        <input
+          ref={avatarInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          className="hidden"
+          aria-label="Upload profile photo"
+          onChange={(e) => handleAvatarFile(e.target.files?.[0])}
+        />
+        {avatarUploadError && (
+          <p className="mt-2 text-[13px] text-red-400">{avatarUploadError}</p>
+        )}
+        <div className="mt-4 flex flex-wrap gap-3">
+          {AVATARS.map((a) => {
+            const active = profile.avatar_url === `avatar:${a.id}`;
+            return (
+              <button
+                key={a.id}
+                type="button"
+                aria-pressed={active}
+                title={a.name}
+                onClick={() => pickAvatar(a.id)}
+                className={cn(
+                  "theme-swatch cursor-pointer rounded-2xl border-2 p-0.5",
+                  active ? "border-accent" : "border-transparent hover:border-line"
+                )}
+              >
+                <Avatar avatarId={a.id} name={profile.display_name} className="h-14 w-14 text-xl" />
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
       {/* ── Rank progress ─────────────────────────────────────────── */}
       <Card>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -321,57 +372,6 @@ export default function ProfileSettings() {
                   {active && <Check className="h-4 w-4 text-accent-300" />}
                 </span>
                 <span className="text-[12px] text-ink-muted">{t.tagline}</span>
-              </button>
-            );
-          })}
-        </div>
-      </Card>
-
-      {/* ── Avatar picker ─────────────────────────────────────────── */}
-      <Card>
-        <h2 className="font-semibold">Avatar</h2>
-        <p className="mt-1 text-[13px] text-ink-muted">
-          Upload your own photo or pick a mark. Shown beside your name across the app.
-        </p>
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            loading={uploadingAvatar}
-            onClick={() => avatarInputRef.current?.click()}
-          >
-            {uploadingAvatar ? "Uploading…" : "Upload photo"}
-          </Button>
-          <span className="text-[12px] text-ink-muted">JPG, PNG, WebP or GIF · under 2 MB</span>
-        </div>
-        <input
-          ref={avatarInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif"
-          className="hidden"
-          aria-label="Upload profile photo"
-          onChange={(e) => handleAvatarFile(e.target.files?.[0])}
-        />
-        {avatarUploadError && (
-          <p className="mt-2 text-[13px] text-red-400">{avatarUploadError}</p>
-        )}
-        <div className="mt-4 flex flex-wrap gap-3">
-          {AVATARS.map((a) => {
-            const active = profile.avatar_url === `avatar:${a.id}`;
-            return (
-              <button
-                key={a.id}
-                type="button"
-                aria-pressed={active}
-                title={a.name}
-                onClick={() => pickAvatar(a.id)}
-                className={cn(
-                  "theme-swatch cursor-pointer rounded-2xl border-2 p-0.5",
-                  active ? "border-accent" : "border-transparent hover:border-line"
-                )}
-              >
-                <Avatar avatarId={a.id} name={profile.display_name} className="h-14 w-14 text-xl" />
               </button>
             );
           })}
