@@ -320,7 +320,7 @@ function geminiContents({ systemPrompt, messages, imageBase64 }) {
       role: "user",
       parts: [
         { text: systemPrompt },
-        { inline_data: { mime_type: "image/jpeg", data: imageBase64 } },
+        { inlineData: { mimeType: sniffImageMime(imageBase64), data: imageBase64 } },
       ],
     });
     return contents;
@@ -333,7 +333,7 @@ function geminiContents({ systemPrompt, messages, imageBase64 }) {
   return contents;
 }
 
-async function callGemini({ systemPrompt, messages, imageBase64, json }) {
+async function callGemini({ systemPrompt, messages, imageBase64, json, timeoutMs }) {
   if (!process.env.GEMINI_API_KEY) {
     throw new ProviderError("GEMINI_API_KEY is not configured", { status: 501 });
   }
@@ -356,7 +356,7 @@ async function callGemini({ systemPrompt, messages, imageBase64, json }) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  });
+  }, timeoutMs);
   const text =
     data?.candidates?.[0]?.content?.parts
       ?.map((p) => p.text)
@@ -381,14 +381,20 @@ export async function runCompletion(params) {
   let lastUserMessage = null;
   for (const [i, fn] of attempts.entries()) {
     try {
-      const result = await fn(params);
+      // Plumbing fix: the computed timeoutMs (50s for food scans) is now
+      // actually passed to the providers — previously it was calculated
+      // here but never forwarded, so scans aborted at the 15s default.
+      const result = await fn({ ...params, timeoutMs });
       return {
         ...result,
         fallbackUsed: i > 0,
         providerCalls: providerCalls + (result.providerCalls || 1),
       };
     } catch (err) {
-      providerCalls += err?.providerCalls || 1;
+      // Only count provider calls that actually fired (a 501 "key not
+      // configured" fires zero requests, so it must not add a phantom call
+      // to the quota ledger).
+      providerCalls += err?.providerCalls ?? 0;
       if (err?.userMessage) lastUserMessage = err.userMessage;
       const status = err?.status || 500;
       const isClientError = status === 400 || status === 401 || status === 403;
