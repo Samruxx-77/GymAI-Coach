@@ -176,7 +176,7 @@ export default function Dashboard() {
           </div>
           <div className="mt-4">
             <ProgressBar
-              value={(weekWorkoutCount / profile.weekly_workout_target) * 100}
+              value={(weekWorkoutCount / (profile.weekly_workout_target || 1)) * 100}
               tone="success"
               label="Workouts this week"
             />
