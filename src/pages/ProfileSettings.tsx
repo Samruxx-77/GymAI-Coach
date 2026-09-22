@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Award,
@@ -18,6 +18,7 @@ import { useProfile } from "../context/ProfileContext";
 import { useAuth } from "../context/AuthContext";
 import { useData } from "../context/DataContext";
 import { useTheme } from "../context/ThemeContext";
+import { supabase } from "../lib/supabase";
 import { calculateTargets, goalLabel } from "../lib/nutrition";
 import { deleteAccount } from "../lib/account";
 import { SUPPORT_EMAIL } from "../lib/contact";
@@ -144,6 +145,56 @@ export default function ProfileSettings() {
     await refresh();
   }
 
+  // ── Custom profile photo upload (Supabase Storage) ──
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarUploadError, setAvatarUploadError] = useState<string | null>(null);
+
+  const AVATAR_MAX_BYTES = 2 * 1024 * 1024; // 2 MB
+  const AVATAR_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
+  async function handleAvatarFile(file: File | undefined) {
+    setAvatarUploadError(null);
+    if (!file) return;
+    if (!AVATAR_MIME_TYPES.includes(file.type)) {
+      setAvatarUploadError("Please choose a JPG, PNG, WebP or GIF image.");
+      return;
+    }
+    if (file.size > AVATAR_MAX_BYTES) {
+      setAvatarUploadError("Please choose an image under 2 MB.");
+      return;
+    }
+    if (!user?.id) {
+      setAvatarUploadError("You need to be signed in to upload a photo.");
+      return;
+    }
+    const ext =
+      file.type === "image/png" ? "png"
+      : file.type === "image/webp" ? "webp"
+      : file.type === "image/gif" ? "gif"
+      : "jpg";
+    const path = `${user.id}/avatar.${ext}`;
+    setUploadingAvatar(true);
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (uploadError) throw new Error(uploadError.message);
+      const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+      // Cache-buster so the new photo shows immediately.
+      const url = `${data.publicUrl}?t=${Date.now()}`;
+      const { error: saveError } = await updateProfile({ avatar_url: url });
+      if (saveError) throw new Error(saveError);
+      setSaved(false);
+      await refresh();
+    } catch (err) {
+      setAvatarUploadError(err instanceof Error ? err.message : "Upload failed. Please try again.");
+    } finally {
+      setUploadingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  }
+
   if (!profile) return <div className="skeleton h-64" />;
 
   const rank = rankForXp(profile.xp);
@@ -244,7 +295,7 @@ export default function ProfileSettings() {
         <p className="mt-1 text-[13px] text-ink-muted">
           Pick the mood of your gym. Applies instantly across the whole app.
         </p>
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
           {THEME_IDS.map((id) => {
             const t = THEMES[id];
             const active = theme === id;
@@ -280,8 +331,31 @@ export default function ProfileSettings() {
       <Card>
         <h2 className="font-semibold">Avatar</h2>
         <p className="mt-1 text-[13px] text-ink-muted">
-          Choose your mark. Shown beside your name across the app.
+          Upload your own photo or pick a mark. Shown beside your name across the app.
         </p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            loading={uploadingAvatar}
+            onClick={() => avatarInputRef.current?.click()}
+          >
+            {uploadingAvatar ? "Uploading…" : "Upload photo"}
+          </Button>
+          <span className="text-[12px] text-ink-muted">JPG, PNG, WebP or GIF · under 2 MB</span>
+        </div>
+        <input
+          ref={avatarInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          className="hidden"
+          aria-label="Upload profile photo"
+          onChange={(e) => handleAvatarFile(e.target.files?.[0])}
+        />
+        {avatarUploadError && (
+          <p className="mt-2 text-[13px] text-red-400">{avatarUploadError}</p>
+        )}
         <div className="mt-4 flex flex-wrap gap-3">
           {AVATARS.map((a) => {
             const active = profile.avatar_url === `avatar:${a.id}`;
