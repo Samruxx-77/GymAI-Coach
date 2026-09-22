@@ -262,7 +262,7 @@ export default function ProfileSettings() {
 
       {/* ── Avatar picker ─────────────────────────────────────────── */}
       <Card>
-        <h2 className="font-bold">Avatar</h2>
+        <h2 className="text-xl font-extrabold">Avatar</h2>
         <p className="mt-1 text-[13px] text-ink-muted">
           Upload your own photo or pick a mark. Shown beside your name across the app.
         </p>
