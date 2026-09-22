@@ -493,3 +493,40 @@ begin
   join public.exercises e on e.name = t.name
   where not exists (select 1 from public.workout_exercises we where we.workout_id = w_lower);
 end $$;
+
+-- ── Avatar uploads (Supabase Storage) ─────────────────────────────
+-- Public "avatars" bucket; each user may read publicly but only
+-- upload/replace/delete their own <user-id>/... files.
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "avatars public read" on storage.objects;
+create policy "avatars public read" on storage.objects
+for select using (bucket_id = 'avatars');
+
+drop policy if exists "avatars owner insert" on storage.objects;
+create policy "avatars owner insert" on storage.objects
+for insert with check (
+  bucket_id = 'avatars'
+  and auth.uid()::text = (storage.foldername(name))[1]
+);
+
+drop policy if exists "avatars owner update" on storage.objects;
+create policy "avatars owner update" on storage.objects
+for update
+using (
+  bucket_id = 'avatars'
+  and auth.uid()::text = (storage.foldername(name))[1]
+)
+with check (
+  bucket_id = 'avatars'
+  and auth.uid()::text = (storage.foldername(name))[1]
+);
+
+drop policy if exists "avatars owner delete" on storage.objects;
+create policy "avatars owner delete" on storage.objects
+for delete using (
+  bucket_id = 'avatars'
+  and auth.uid()::text = (storage.foldername(name))[1]
+);
