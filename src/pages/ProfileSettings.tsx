@@ -505,7 +505,9 @@ export default function ProfileSettings() {
           className="mt-4"
           onClick={async () => {
             await signOut();
-            navigate("/", { replace: true });
+            // Full reload: guarantees the auth state is cleared before the
+            // landing page renders (avoids a stale-session bounce to /auth).
+            window.location.assign("/");
           }}
         >
           <LogOut className="h-4 w-4" /> Sign out
