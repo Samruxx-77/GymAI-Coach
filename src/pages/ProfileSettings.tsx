@@ -25,7 +25,7 @@ import { SUPPORT_EMAIL } from "../lib/contact";
 import { rankForXp } from "../lib/gamification";
 import { THEMES, THEME_IDS } from "../lib/themes";
 import { cn, formatNumber } from "../lib/utils";
-import bannerArt from "../assets/profile-banner.svg";
+import bannerArt from "../assets/profile-banner.jpg";
 import type { ActivityLevel, ExperienceLevel, Gender, Goal } from "../lib/types";
 
 export default function ProfileSettings() {
@@ -217,7 +217,7 @@ export default function ProfileSettings() {
       {/* ── Banner + identity ─────────────────────────────────────── */}
       <Card className="overflow-hidden !p-0">
         <div
-          className="profile-banner relative h-40 sm:h-48"
+          className="profile-banner relative h-48 sm:h-60"
           style={{ backgroundImage: `url(${bannerArt})` }}
         >
           <div className="profile-banner-fade absolute inset-0" />
@@ -233,7 +233,7 @@ export default function ProfileSettings() {
         <div className="px-5 pb-5 sm:px-6">
           {/* identity row: only the avatar chip overlaps the banner */}
           <div className="-mt-10 flex items-end gap-3.5 sm:-mt-12 sm:gap-4">
-            <div className="shrink-0 rounded-[18px] bg-surface-1 p-1.5 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.7)] ring-1 ring-line">
+            <div className="shrink-0 rounded-[18px] bg-surface-1 p-1.5 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.7)] ring-2 ring-accent/40">
               <Avatar
                 avatarId={profile.avatar_url}
                 name={profile.display_name}
