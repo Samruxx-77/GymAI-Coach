@@ -124,13 +124,10 @@ export default function Landing() {
             <p className="mt-4 text-[13px] text-ink-faint">Free to start · Works with any gym</p>
           </div>
 
-          {/* Video stage — AI-generated gym film, stat chips float over it.
-              Video only on sm+ screens: a 3.9MB autoplaying video is the #1
-              scroll-jank cause on phones, so mobile gets the static photo. */}
+          {/* Video stage — AI-generated gym film (20s), stat chips float over it */}
           <div className="relative mx-auto h-[340px] w-full max-w-lg overflow-hidden rounded-3xl border border-line shadow-[0_24px_60px_-20px_rgba(0,0,0,0.55)] sm:h-[420px] lg:h-[500px]">
-            <div aria-hidden className="absolute inset-0 bg-cover bg-center sm:hidden" style={{ backgroundImage: `url(${heroBg})` }} />
             <video
-              className="absolute inset-0 hidden h-full w-full object-cover sm:block"
+              className="absolute inset-0 h-full w-full object-cover"
               src={heroVideo}
               autoPlay
               muted
