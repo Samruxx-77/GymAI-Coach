@@ -13,8 +13,11 @@ import {
 import { cn, formatNumber } from "../lib/utils";
 import { rankForXp } from "../lib/gamification";
 import { useProfile } from "../context/ProfileContext";
+import { useData } from "../context/DataContext";
 import { Avatar } from "./Avatar";
 import { Logo } from "./Logo";
+import { TriangleAlert } from "lucide-react";
+import { useState } from "react";
 
 const NAV = [
   { to: "/app", label: "Dashboard", icon: Activity, end: true },
@@ -89,8 +92,13 @@ function BottomItem({
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { profile } = useProfile();
+  const { error: dataError, refresh } = useData();
+  const [dismissedError, setDismissedError] = useState<string | null>(null);
   const navigate = useNavigate();
   const rank = rankForXp(profile?.xp ?? 0);
+  // Surface data-loading failures (offline, RLS hiccups) instead of showing
+  // silently empty screens. Dismiss is per-message so a new failure re-appears.
+  const showError = dataError && dismissedError !== dataError;
 
   return (
     <div className="flex min-h-screen bg-surface-0">
@@ -155,6 +163,30 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Content */}
       <div className="flex min-h-screen flex-1 flex-col lg:pl-60">
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-24 pt-20 lg:px-8 lg:pb-12 lg:pt-8">
+          {showError && (
+            <div role="alert" className="mb-4 flex items-start gap-3 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-[13px] text-ink">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
+              <p className="flex-1">
+                <span className="font-semibold">Couldn't load your data.</span>{" "}
+                <span className="text-ink-muted">{dataError}</span>
+              </p>
+              <button
+                type="button"
+                className="shrink-0 cursor-pointer rounded-lg bg-danger/15 px-3 py-1.5 font-semibold text-danger hover:bg-danger/25"
+                onClick={() => { setDismissedError(null); void refresh(); }}
+              >
+                Retry
+              </button>
+              <button
+                type="button"
+                aria-label="Dismiss"
+                className="shrink-0 cursor-pointer rounded-lg px-2 py-1.5 text-ink-faint hover:bg-surface-2 hover:text-ink"
+                onClick={() => setDismissedError(dataError)}
+              >
+                ✕
+              </button>
+            </div>
+          )}
           {children}
         </main>
       </div>
