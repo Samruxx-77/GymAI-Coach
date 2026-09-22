@@ -21,8 +21,8 @@ import { useTheme } from "../context/ThemeContext";
 import { THEMES, THEME_IDS } from "../lib/themes";
 import { cn } from "../lib/utils";
 import { prefersReducedMotion } from "../lib/env";
-import heroArt from "../assets/hero-gym.svg";
 import heroVideo from "../assets/landing-hero.mp4";
+import heroBg from "../assets/landing-hero-bg.jpg";
 
 const STATS = [
   { icon: Dumbbell, value: "42", label: "guided exercises" },
@@ -91,16 +91,14 @@ export default function Landing() {
         </div>
       </header>
 
-      {/* Hero — gym-scene backdrop, copy left, 3D stage right */}
+      {/* Hero — AI-generated gym photograph backdrop, copy left, video stage right */}
       <section className="relative overflow-hidden">
-        {/* moody gym photograph backdrop, fading seamlessly into the page */}
+        {/* bright gym photograph backdrop, fading seamlessly into the page */}
         <div aria-hidden className="pointer-events-none absolute inset-0">
-          <div className="absolute inset-0 bg-cover bg-[position:center_35%] opacity-[0.4]" style={{ backgroundImage: `url(${heroArt})` }} />
-          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, color-mix(in oklab, var(--color-surface-0) 35%, transparent) 0%, transparent 32%, var(--color-surface-0) 94%)" }} />
+          <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${heroBg})` }} />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, color-mix(in oklab, var(--color-surface-0) 55%, transparent) 0%, color-mix(in oklab, var(--color-surface-0) 25%, transparent) 45%, var(--color-surface-0) 96%)" }} />
         </div>
-        <div aria-hidden className="pointer-events-none absolute inset-0"
-          style={{ background: "radial-gradient(900px 500px at 15% -10%, var(--color-accent-soft), transparent), radial-gradient(700px 420px at 85% 25%, color-mix(in oklab, var(--color-data-blue) 10%, transparent), transparent)" }} />
-        {/* faint grid floor to anchor the 3D stage */}
+        {/* faint grid floor to anchor the video stage */}
         <div aria-hidden className="hero-grid pointer-events-none absolute inset-x-0 bottom-0 h-[420px] opacity-[0.14]" />
 
         <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-5 pb-20 pt-14 sm:pt-20 lg:grid-cols-[1.05fr_1fr] lg:gap-6">
