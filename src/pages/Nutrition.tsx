@@ -112,7 +112,7 @@ export default function Nutrition() {
     <div className="page-fade space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="display text-2xl font-bold">Nutrition</h1>
+          <h1 className="display text-2xl font-bold">Food Entry</h1>
           <p className="text-[13px] text-ink-muted">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -126,7 +126,7 @@ export default function Nutrition() {
                 }`}
               >
                 {t === "scan" && <ScanLine className="h-4 w-4" />}
-                {t === "diary" ? "Diary" : "Scan Your Food"}
+                {t === "diary" ? "Food Entry" : "Scan Your Food"}
               </button>
             ))}
           </div>
