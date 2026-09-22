@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Sparkles, Trash2, Zap } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { Plus, ScanLine, Sparkles, Trash2, Zap } from "lucide-react";
 import { Card, Button, Input, Select } from "../components/ui";
 import { Markdown } from "../components/Markdown";
+import { FoodScanner } from "../components/FoodScanner";
 import { askCoach } from "../lib/aiClient";
 import { useData } from "../context/DataContext";
 import { useProfile } from "../context/ProfileContext";
@@ -54,6 +56,21 @@ export default function Nutrition() {
 
   /* quick-add in-flight guard: key of the chip currently being logged */
   const [quickBusy, setQuickBusy] = useState<string | null>(null);
+
+  /* Diary / Scan tabs — deep-linkable via ?mode=scan */
+  const [params, setParams] = useSearchParams();
+  const [tab, setTab] = useState<"diary" | "scan">(
+    params.get("mode") === "scan" ? "scan" : "diary"
+  );
+  function selectTab(t: "diary" | "scan") {
+    setTab(t);
+    setParams((p) => {
+      const next = new URLSearchParams(p);
+      if (t === "scan") next.set("mode", "scan");
+      else next.delete("mode");
+      return next;
+    }, { replace: true });
+  }
 
   async function loadIdeas() {
     setIdeasBusy(true);
@@ -137,15 +154,38 @@ export default function Nutrition() {
 
   return (
     <div className="page-fade space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="display text-2xl font-bold">Nutrition</h1>
           <p className="text-[13px] text-ink-muted">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}</p>
         </div>
-        <Button onClick={() => setOpen((o) => !o)}>
-          <Plus className="h-4 w-4" /> Add food
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-xl border border-line bg-surface-1 p-1">
+            {(["diary", "scan"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => selectTab(t)}
+                className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                  tab === t ? "bg-accent-soft text-ink" : "text-ink-muted hover:text-ink"
+                }`}
+              >
+                {t === "scan" && <ScanLine className="h-4 w-4" />}
+                {t === "diary" ? "Diary" : "Scan"}
+              </button>
+            ))}
+          </div>
+          {tab === "diary" && (
+            <Button onClick={() => setOpen((o) => !o)}>
+              <Plus className="h-4 w-4" /> Add food
+            </Button>
+          )}
+        </div>
       </div>
+
+      {tab === "scan" ? (
+        <FoodScanner />
+      ) : (
+      <>
 
       {/* Totals vs targets */}
       <Card>
@@ -342,6 +382,8 @@ export default function Nutrition() {
           );
         })}
       </div>
+      </>
+      )}
     </div>
   );
 }
