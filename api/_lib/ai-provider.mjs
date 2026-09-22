@@ -28,9 +28,19 @@ function envMs(name, fallback) {
 }
 // Budgets stay UNDER the client timeouts so the server's error surfaces
 // first (client coach = 30s, client food scan = 55s, Vercel maxDuration = 60s).
-const TIMEOUT_MS = envMs("AI_TIMEOUT_MS", 25_000);
+// Text attempts are hedged (see callOpenRouter): the per-attempt timeout only
+// needs to bound a truly hung model, because a slow-but-alive primary gets a
+// fallback fired after HEDGE_DELAY_MS.
+const TIMEOUT_MS = envMs("AI_TIMEOUT_MS", 15_000);
 /** Vision/food analysis needs a roomier budget than text chat. */
 const FOOD_TIMEOUT_MS = envMs("AI_FOOD_TIMEOUT_MS", 50_000);
+/**
+ * Hedging delay: if the primary model hasn't answered within this long,
+ * fire the next model in parallel. First success wins, losers are aborted.
+ * This kills the tail latency of sequential fallbacks (a busy primary no
+ * longer costs a full timeout before the fallback even starts).
+ */
+const HEDGE_DELAY_MS = envMs("AI_HEDGE_DELAY_MS", 5_000);
 
 class ProviderError extends Error {
   constructor(message, { status, provider } = {}) {
@@ -48,8 +58,13 @@ function timeoutSignal(ms) {
   return ctrl.signal;
 }
 
-async function fetchJson(url, options, timeoutMs) {
-  const res = await fetch(url, { ...options, signal: timeoutSignal(timeoutMs ?? TIMEOUT_MS) });
+async function fetchJson(url, options, timeoutMs, signal) {
+  const res = await fetch(url, {
+    ...options,
+    // Hedged attempts pass their own AbortController so losers can be
+    // cancelled; otherwise fall back to a plain timeout signal.
+    signal: signal ?? timeoutSignal(timeoutMs ?? TIMEOUT_MS),
+  });
   const text = await res.text();
   let json = null;
   try {
@@ -86,7 +101,7 @@ function orModelChain({ imageBase64 }) {
   return [...new Set([OR_TEXT_MODEL, ...OR_FALLBACKS])];
 }
 
-async function orOnce(model, { systemPrompt, messages, imageBase64, json }, timeoutMs) {
+async function orOnce(model, { systemPrompt, messages, imageBase64, json }, timeoutMs, signal) {
   const base = (process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1").replace(/\/$/, "");
   const content = imageBase64
     ? [
@@ -102,7 +117,9 @@ async function orOnce(model, { systemPrompt, messages, imageBase64, json }, time
     temperature: json ? 0.2 : 0.7,
     // Vision models on the free tier reason extensively before answering —
     // give image calls a larger budget so reasoning doesn't eat the reply.
-    max_tokens: imageBase64 ? 4096 : 3072,
+    // Text chat only needs a couple of paragraphs, so cap it lower: output
+    // length is the main driver of generation latency.
+    max_tokens: imageBase64 ? 4096 : 1500,
     // Free-tier models are frequently reasoning models; strip hidden reasoning
     // tokens so `content` carries the actual answer (harmless on plain models).
     reasoning: { exclude: true },
@@ -120,10 +137,125 @@ async function orOnce(model, { systemPrompt, messages, imageBase64, json }, time
       "X-Title": "GymAI Coach",
     },
     body: JSON.stringify(body),
-  }, timeoutMs);
+  }, timeoutMs, signal);
   const text = data?.choices?.[0]?.message?.content?.trim() || "";
   if (!text) throw new ProviderError("Empty response from OpenRouter", { status: 502 });
   return { text, provider: `openrouter:${data?.model || model}` };
+}
+
+/**
+ * Classify a per-model failure: some errors mean "no other model can
+ * succeed" (fail the whole request now), the rest mean "try the next one".
+ */
+function classifyModelError(err) {
+  // 401 = the API key itself is bad — no other model can succeed.
+  if (err?.status === 401) {
+    return {
+      failFast: true,
+      error: new ProviderError(
+        "OpenRouter API key is invalid or revoked — the app owner needs to update it.",
+        { status: 401 }
+      ),
+    };
+  }
+  // A 400 that is NOT about this model (bad request shape, policy
+  // rejection) will fail identically on every model — fail fast
+  // instead of burning the fallback chain on a doomed request. Only
+  // model-specific 400s (dead/retired slugs) move to the next model.
+  if (err?.status === 400 && !/no endpoints found|model.*not found|invalid model|unknown model/i.test(err?.message || "")) {
+    return { failFast: true, error: err };
+  }
+  return { failFast: false, error: err };
+}
+
+function exhaustedError(errors, providerCalls) {
+  const exhausted = new ProviderError(`All OpenRouter models failed. ${errors.join(" | ")}`, {
+    status: 502,
+  });
+  exhausted.providerCalls = providerCalls;
+  // Safe, user-facing explanation — survives the 5xx sanitizer in errorResponse.
+  exhausted.userMessage =
+    "The free AI models are busy right now. Please wait a moment and try again.";
+  return exhausted;
+}
+
+/**
+ * Fire the model chain with hedging: the primary model goes immediately;
+ * if it hasn't answered within HEDGE_DELAY_MS, the next model fires in
+ * parallel, and so on. The first success wins and the losers are aborted,
+ * so a busy primary no longer costs a full timeout before the fallback
+ * even starts. providerCalls counts attempts actually fired, so the quota
+ * ledger still reflects real spend.
+ */
+function raceModels(models, params, perAttemptMs) {
+  return new Promise((resolve, reject) => {
+    const errors = [];
+    const controllers = [];
+    let fired = 0;
+    let nextIndex = 0;
+    let settled = false;
+
+    const abortAll = () => {
+      for (const c of controllers) {
+        try {
+          c.abort();
+        } catch {
+          /* already settled — ignore */
+        }
+      }
+    };
+    const finishRejected = (err) => {
+      if (settled) return;
+      settled = true;
+      clearInterval(hedgeTimer);
+      abortAll();
+      reject(err);
+    };
+
+    const fireNext = () => {
+      if (settled || nextIndex >= models.length) return;
+      const model = models[nextIndex++];
+      fired += 1;
+      const ctrl = new AbortController();
+      controllers.push(ctrl);
+      const timer = setTimeout(() => ctrl.abort(), perAttemptMs);
+      orOnce(model, params, perAttemptMs, ctrl.signal).then(
+        (result) => {
+          clearTimeout(timer);
+          if (settled) return;
+          settled = true;
+          clearInterval(hedgeTimer);
+          abortAll(); // cancel the losers
+          result.providerCalls = fired;
+          resolve(result);
+        },
+        (err) => {
+          clearTimeout(timer);
+          if (settled) return; // an aborted loser racing a winner — ignore
+          const { failFast, error } = classifyModelError(err);
+          if (failFast) {
+            finishRejected(error);
+            return;
+          }
+          errors.push(`${model}: ${err?.message || err}`);
+          if (fired >= models.length && errors.length >= fired) {
+            finishRejected(exhaustedError(errors, fired));
+          }
+          // otherwise: keep waiting for in-flight / not-yet-fired models
+        }
+      );
+    };
+
+    fireNext(); // primary fires immediately
+    const hedgeTimer = setInterval(() => {
+      if (settled) {
+        clearInterval(hedgeTimer);
+        return;
+      }
+      if (nextIndex < models.length) fireNext();
+      else clearInterval(hedgeTimer);
+    }, HEDGE_DELAY_MS);
+  });
 }
 
 async function callOpenRouter({ systemPrompt, messages, imageBase64, json, timeoutMs }) {
@@ -136,40 +268,28 @@ async function callOpenRouter({ systemPrompt, messages, imageBase64, json, timeo
   // survives dead slugs. A 429 on one model just moves to the next, which
   // usually sits in a different upstream pool.
   const params = { systemPrompt, messages, imageBase64, json };
-  const errors = [];
-  let providerCalls = 0;
-  for (const model of orModelChain({ imageBase64 })) {
-    providerCalls += 1;
-    try {
-      const result = await orOnce(model, params, timeoutMs);
-      result.providerCalls = providerCalls;
-      return result;
-    } catch (err) {
-      // 401 = the API key itself is bad — no other model can succeed.
-      if (err?.status === 401) {
-        throw new ProviderError(
-          "OpenRouter API key is invalid or revoked — the app owner needs to update it.",
-          { status: 401 }
-        );
+  const models = orModelChain({ imageBase64 });
+  const perAttemptMs = timeoutMs ?? TIMEOUT_MS;
+  // Vision requests have a single model — no hedging, keep the simple
+  // sequential path.
+  if (models.length < 2) {
+    const errors = [];
+    let providerCalls = 0;
+    for (const model of models) {
+      providerCalls += 1;
+      try {
+        const result = await orOnce(model, params, perAttemptMs);
+        result.providerCalls = providerCalls;
+        return result;
+      } catch (err) {
+        const { failFast, error } = classifyModelError(err);
+        if (failFast) throw error;
+        errors.push(`${model}: ${err?.message || err}`);
       }
-      // A 400 that is NOT about this model (bad request shape, policy
-      // rejection) will fail identically on every model — fail fast
-      // instead of burning the fallback chain on a doomed request. Only
-      // model-specific 400s (dead/retired slugs) move to the next model.
-      if (err?.status === 400 && !/no endpoints found|model.*not found|invalid model|unknown model/i.test(err?.message || "")) {
-        throw err;
-      }
-      errors.push(`${model}: ${err?.message || err}`);
     }
+    throw exhaustedError(errors, providerCalls);
   }
-  const exhausted = new ProviderError(`All OpenRouter models failed. ${errors.join(" | ")}`, {
-    status: 502,
-  });
-  exhausted.providerCalls = providerCalls;
-  // Safe, user-facing explanation — survives the 5xx sanitizer in errorResponse.
-  exhausted.userMessage =
-    "The free AI models are busy right now. Please wait a moment and try again.";
-  throw exhausted;
+  return raceModels(models, params, perAttemptMs);
 }
 
 /** Detect the image MIME type from base64 magic bytes (default: jpeg). */
