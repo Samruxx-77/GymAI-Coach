@@ -102,7 +102,8 @@ create index if not exists food_entries_user_date on public.food_entries (user_i
 -- ── 4. EXERCISES (seeded library, read-only) ───────────────────────
 create table if not exists public.exercises (
   id            uuid primary key default gen_random_uuid(),
-  name          text not null unique,
+  user_id       uuid references auth.users(id) on delete cascade, -- null = system exercise
+  name          text not null,
   muscle_group  text not null check (muscle_group in ('chest','back','shoulders','arms','legs','core','full_body','cardio')),
   equipment     text not null default 'bodyweight' check (equipment in ('barbell','dumbbell','machine','cable','bodyweight','kettlebell','band','cardio')),
   is_compound   boolean not null default false,
@@ -110,6 +111,11 @@ create table if not exists public.exercises (
   tips          text not null default '',
   created_at    timestamptz not null default now()
 );
+-- system exercise names unique; each user's own exercise names unique per user
+create unique index if not exists exercises_system_name_unique
+  on public.exercises (name) where user_id is null;
+create unique index if not exists exercises_user_name_unique
+  on public.exercises (user_id, name) where user_id is not null;
 
 -- ── 5. WORKOUTS (templates: system + user-created) ─────────────────
 create table if not exists public.workouts (
@@ -276,9 +282,20 @@ begin
   end loop;
 end $$;
 
--- exercises + achievements: world-readable seed data, writable by no one
+-- exercises: system seed data readable by all; users can manage only their own rows
 drop policy if exists "public read" on public.exercises;
-create policy "public read" on public.exercises for select using (true);
+drop policy if exists "read system + own exercises" on public.exercises;
+create policy "read system + own exercises" on public.exercises
+  for select using (user_id is null or user_id = auth.uid());
+drop policy if exists "insert own exercise" on public.exercises;
+create policy "insert own exercise" on public.exercises
+  for insert with check (user_id = auth.uid());
+drop policy if exists "update own exercise" on public.exercises;
+create policy "update own exercise" on public.exercises
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists "delete own exercise" on public.exercises;
+create policy "delete own exercise" on public.exercises
+  for delete using (user_id = auth.uid());
 drop policy if exists "public read" on public.achievements;
 create policy "public read" on public.achievements for select using (true);
 
