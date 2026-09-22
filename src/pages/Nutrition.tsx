@@ -178,9 +178,8 @@ export default function Nutrition() {
       {/* Manual entry */}
       <div>
         <Button
-          variant="secondary"
+          variant="primary"
           size="sm"
-          className="border-accent shadow-[0_0_16px_-4px_var(--color-accent)] hover:shadow-[0_0_22px_-2px_var(--color-accent)]"
           onClick={() => setOpen((o) => !o)}
         >
           Add Your Food Manually

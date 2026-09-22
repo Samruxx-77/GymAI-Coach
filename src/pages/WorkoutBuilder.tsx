@@ -4,7 +4,7 @@ import { ArrowLeft, GripVertical, Plus, Save, Search, Trash2 } from "lucide-reac
 import { Card, Button, Input, Select, Badge } from "../components/ui";
 import { useData } from "../context/DataContext";
 import { cn } from "../lib/utils";
-import type { Exercise, WorkoutCategory } from "../lib/types";
+import type { Exercise, MuscleGroup, WorkoutCategory } from "../lib/types";
 
 interface Line { exercise_id: string; sets: number; reps: string; rest_seconds: number; notes: string; }
 
@@ -13,7 +13,7 @@ const CATEGORIES: WorkoutCategory[] = ["push", "pull", "legs", "full_body", "upp
 export default function WorkoutBuilder() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { userWorkouts, exercises, saveWorkout, deleteWorkout } = useData();
+  const { userWorkouts, exercises, saveWorkout, deleteWorkout, createExercise } = useData();
 
   const editing = useMemo(
     () => [...userWorkouts].find((w) => w.id === id) ?? null,
@@ -31,6 +31,13 @@ export default function WorkoutBuilder() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  // custom exercise form
+  const [showCustom, setShowCustom] = useState(false);
+  const [customName, setCustomName] = useState("");
+  const [customGroup, setCustomGroup] = useState<MuscleGroup>("chest");
+  const [customEquipment, setCustomEquipment] = useState("bodyweight");
+  const [customBusy, setCustomBusy] = useState(false);
+  const [customError, setCustomError] = useState<string | null>(null);
 
   useEffect(() => {
     if (loaded) return;
@@ -66,6 +73,26 @@ export default function WorkoutBuilder() {
 
   function addExercise(ex: Exercise) {
     setLines((ls) => [...ls, { exercise_id: ex.id, sets: 3, reps: "10", rest_seconds: 90, notes: "" }]);
+  }
+
+  async function saveCustomExercise() {
+    setCustomError(null);
+    const nm = customName.trim();
+    if (!nm) return setCustomError("Give your exercise a name.");
+    setCustomBusy(true);
+    const { error: err, exercise } = await createExercise({
+      name: nm,
+      muscle_group: customGroup,
+      equipment: customEquipment,
+    });
+    setCustomBusy(false);
+    if (err || !exercise) {
+      setCustomError(err ?? "Could not save the exercise. Please try again.");
+      return;
+    }
+    addExercise(exercise);
+    setCustomName("");
+    setShowCustom(false);
   }
   function updateLine(idx: number, patch: Partial<Line>) {
     setLines((ls) => ls.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
@@ -110,7 +137,7 @@ export default function WorkoutBuilder() {
         <button className="flex items-center gap-1 text-[13px] text-ink-muted hover:text-ink" onClick={() => navigate("/app/workouts")}>
           <ArrowLeft className="h-3.5 w-3.5" /> Workouts
         </button>
-        <h1 className="display mt-1 text-2xl font-bold">{editing ? "Edit workout" : "Build workout"}</h1>
+        <h1 className="display mt-1 text-2xl font-bold">{editing ? "Edit workout" : "Add Exercises"}</h1>
       </div>
 
       <Card>
@@ -218,6 +245,59 @@ export default function WorkoutBuilder() {
           ))}
         </div>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {/* Create own exercise — always on top */}
+          {!showCustom ? (
+            <button
+              onClick={() => { setShowCustom(true); setCustomError(null); }}
+              className="flex cursor-pointer items-center justify-between gap-2 rounded-xl border border-dashed border-accent px-3 py-2.5 text-left transition-colors hover:bg-accent-soft"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-[14px] font-medium text-ink">Create own exercise</p>
+                <p className="text-[12px] text-ink-faint">Add a custom exercise with your own name</p>
+              </div>
+              <Plus className="h-4 w-4 text-accent-300" />
+            </button>
+          ) : (
+            <div className="rounded-xl border border-accent bg-surface-2 p-3 sm:col-span-2">
+              <p className="text-[14px] font-medium text-ink">Create own exercise</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                <div className="sm:col-span-3">
+                  <label className="mb-1 block text-[11px] text-ink-faint">Exercise name</label>
+                  <Input
+                    value={customName}
+                    onChange={(e) => setCustomName(e.target.value)}
+                    placeholder="e.g. Incline DB Fly"
+                    className="h-9"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] text-ink-faint">Muscle group</label>
+                  <Select value={customGroup} onChange={(e) => setCustomGroup(e.target.value as MuscleGroup)} className="h-9">
+                    {(["chest", "back", "shoulders", "arms", "legs", "core", "full_body", "cardio"] as MuscleGroup[]).map((g) => (
+                      <option key={g} value={g}>{g.replace(/_/g, " ")}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] text-ink-faint">Equipment</label>
+                  <Select value={customEquipment} onChange={(e) => setCustomEquipment(e.target.value)} className="h-9">
+                    {["barbell", "dumbbell", "machine", "cable", "bodyweight", "kettlebell", "band", "cardio"].map((eq) => (
+                      <option key={eq} value={eq}>{eq}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="flex items-end gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => { setShowCustom(false); setCustomError(null); }}>
+                    Cancel
+                  </Button>
+                  <Button size="sm" loading={customBusy} onClick={saveCustomExercise}>
+                    <Plus className="h-4 w-4" /> Add
+                  </Button>
+                </div>
+              </div>
+              {customError && <p className="mt-2 text-[13px] text-danger">{customError}</p>}
+            </div>
+          )}
           {filtered.map((ex) => {
             const added = lines.some((l) => l.exercise_id === ex.id);
             return (
@@ -231,7 +311,10 @@ export default function WorkoutBuilder() {
                 )}
               >
                 <div className="min-w-0">
-                  <p className="truncate text-[14px] font-medium text-ink">{ex.name}</p>
+                  <p className="truncate text-[14px] font-medium text-ink">
+                    {ex.name}
+                    {ex.user_id && <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-semibold uppercase text-accent-300">Custom</span>}
+                  </p>
                   <p className="text-[12px] text-ink-faint">{ex.muscle_group} · {ex.equipment}{ex.is_compound ? " · compound" : ""}</p>
                 </div>
                 {added ? <Badge tone="success">Added</Badge> : <Plus className="h-4 w-4 text-ink-faint" />}

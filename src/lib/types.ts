@@ -76,6 +76,7 @@ export interface Exercise {
   is_compound: boolean;
   instructions: string;
   tips: string;
+  user_id: string | null; // null = system seed, set = user-created custom
 }
 
 export interface Workout {

@@ -23,7 +23,7 @@ export default function Workouts() {
         </div>
         <div className="flex gap-2">
           <Link to="/app/workouts/history"><Button variant="secondary"><History className="h-4 w-4" /> History</Button></Link>
-          <Link to="/app/workouts/new"><Button><Plus className="h-4 w-4" /> Build workout</Button></Link>
+          <Link to="/app/workouts/new"><Button><Plus className="h-4 w-4" /> Add Exercises</Button></Link>
         </div>
       </div>
 

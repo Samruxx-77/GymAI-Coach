@@ -15,6 +15,7 @@ import type {
   Exercise,
   FoodEntry,
   MealType,
+  MuscleGroup,
   Profile,
   UserAchievement,
   WeightEntry,
@@ -62,6 +63,11 @@ interface DataContextValue {
     lineItems: LineItemInput[]
   ) => Promise<{ error: string | null; id: string | null }>;
   deleteWorkout: (id: string) => Promise<{ error: string | null }>;
+  createExercise: (input: {
+    name: string;
+    muscle_group: MuscleGroup;
+    equipment: string;
+  }) => Promise<{ error: string | null; exercise: Exercise | null }>;
   logSession: (input: SessionInput) => Promise<{ error: string | null }>;
 
   // computed
@@ -344,6 +350,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [fetchAll]
   );
 
+  const createExercise = useCallback(
+    async (input: { name: string; muscle_group: MuscleGroup; equipment: string }) => {
+      if (!user) return { error: "Not signed in", exercise: null };
+      const { data, error: err } = await supabase
+        .from("exercises")
+        .insert({ ...input, user_id: user.id, is_compound: false, instructions: "", tips: "" })
+        .select("*")
+        .single();
+      if (err) return { error: err.message, exercise: null };
+      await fetchAll();
+      return { error: null, exercise: data as Exercise };
+    },
+    [user, fetchAll]
+  );
+
   const logSession = useCallback(
     async (input: SessionInput) => {
       if (!user) return { error: "Not signed in" };
@@ -444,7 +465,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const value: DataContextValue = {
     weightEntries, foodEntries, exercises, templates, userWorkouts, sessions,
     xpEvents, achievements, userAchievements, loading, error, refresh: fetchAll,
-    addWeight, updateWeight, deleteWeight, addFood, deleteFood, saveWorkout, deleteWorkout, logSession,
+    addWeight, updateWeight, deleteWeight, addFood, deleteFood, saveWorkout, deleteWorkout, createExercise, logSession,
     today, todayEntries, latestWeight, weightTrendKg, weekWorkoutCount,
     last30Workouts, sessionOn, hasLoggedToday, workoutDoneToday, mealCounts,
   };
