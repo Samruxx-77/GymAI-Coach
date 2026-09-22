@@ -6,7 +6,6 @@ import {
   Dumbbell,
   Flame,
   MessageCircle,
-  ScanLine,
   Trophy,
   User as UserIcon,
   Zap,
@@ -19,8 +18,7 @@ import { Logo } from "./Logo";
 
 const NAV = [
   { to: "/app", label: "Dashboard", icon: Activity, end: true },
-  { to: "/app/nutrition", label: "Nutrition", icon: ChefHat },
-  { to: "/app/scan", label: "Scan", icon: ScanLine },
+  { to: "/app/nutrition", label: "Food Entry", icon: ChefHat },
   { to: "/app/workouts", label: "Workouts", icon: Dumbbell },
   { to: "/app/progress", label: "Progress", icon: CalendarCheck },
   { to: "/app/coach", label: "AI Coach", icon: MessageCircle },
@@ -66,7 +64,7 @@ function BottomItem({
   /** Subtle distinction: icon keeps the accent tint at all times. */
   accent?: boolean;
 }) {
-  const primary = ["/app", "/app/nutrition", "/app/scan", "/app/workouts", "/app/coach", "/app/profile"];
+  const primary = ["/app", "/app/nutrition", "/app/workouts", "/app/coach", "/app/profile"];
   if (!primary.includes(to)) return null;
   return (
     <NavLink
@@ -161,11 +159,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      {/* Mobile bottom nav — six in-bar tabs, scan accent-tinted */}
+      {/* Mobile bottom nav — five in-bar tabs */}
       <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-line bg-surface-0/95 pt-1 pb-[max(env(safe-area-inset-bottom),4px)] backdrop-blur lg:hidden">
         <BottomItem to="/app" label="Home" icon={Activity} end />
-        <BottomItem to="/app/nutrition" label="Nutrition" icon={ChefHat} />
-        <BottomItem to="/app/scan" label="Scan" icon={ScanLine} accent />
+        <BottomItem to="/app/nutrition" label="Food Entry" icon={ChefHat} />
         <BottomItem to="/app/workouts" label="Workouts" icon={Dumbbell} />
         <BottomItem to="/app/coach" label="Coach" icon={MessageCircle} />
         <BottomItem to="/app/profile" label="Profile" icon={UserIcon} />
