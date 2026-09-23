@@ -6,8 +6,9 @@ import { cn } from "../lib/utils";
 export default function ThemeDots({ className }: { className?: string }) {
   const { theme, setTheme, themes } = useTheme();
   return (
-    <div className={cn("flex items-center gap-2", className)} role="group" aria-label="App theme">
+    <div className={cn("flex flex-col items-end gap-1", className)} role="group" aria-label="App theme">
       <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">Theme</span>
+      <div className="flex items-center gap-1.5">
       {themes.map((id: ThemeId) => {
         const t = THEMES[id];
         const active = theme === id;
@@ -29,6 +30,7 @@ export default function ThemeDots({ className }: { className?: string }) {
           />
         );
       })}
+      </div>
     </div>
   );
 }
