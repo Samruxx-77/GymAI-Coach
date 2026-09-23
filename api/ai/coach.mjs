@@ -155,6 +155,15 @@ export default async function handleCoach(req, res, body) {
     }
 
     body = await readJsonBody(req, body);
+    // Tolerance for stale clients: older cached frontends still send
+    // assistant history. Drop non-user messages instead of rejecting —
+    // forged assistant turns are never trusted anyway (the provider call
+    // below forces role "user" on everything that survives).
+    if (body && Array.isArray(body.messages)) {
+      body.messages = body.messages.filter(
+        (m) => m && typeof m === "object" && m.role === "user"
+      );
+    }
     const check = validateCoachBody(body);
     if (check.error) {
       status = 400;
