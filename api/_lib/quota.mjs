@@ -13,7 +13,7 @@
  * service-role key needed.
  *
  * Env knobs (optional):
- *   AI_DAILY_COACH_LIMIT   default 30  (chat completions per user per day)
+ *   AI_DAILY_COACH_LIMIT   default 5   (chat completions per user per day)
  *   AI_DAILY_FOOD_LIMIT    default 15  (vision scans per user per day)
  *
  * If the ai_usage table does not exist yet (migration not run), quota
@@ -35,7 +35,7 @@ function limitFor(endpoint) {
   const raw = Number(
     endpoint === "food" ? process.env.AI_DAILY_FOOD_LIMIT : process.env.AI_DAILY_COACH_LIMIT
   );
-  const fallback = endpoint === "food" ? 15 : 30;
+  const fallback = endpoint === "food" ? 15 : 5;
   return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : fallback;
 }
 

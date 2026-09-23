@@ -185,7 +185,7 @@ export default async function handleCoach(req, res, body) {
         /* header already sent — ignore */
       }
       return json(res, 429, {
-        error: `You've used your ${quota.limit} free AI requests for today. Try again tomorrow.`,
+        error: `You've used all ${quota.limit} AI requests. Your quota resets tomorrow at 5:30 AM IST.`,
       });
     }
 
