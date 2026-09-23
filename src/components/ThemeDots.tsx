@@ -6,7 +6,8 @@ import { cn } from "../lib/utils";
 export default function ThemeDots({ className }: { className?: string }) {
   const { theme, setTheme, themes } = useTheme();
   return (
-    <div className={cn("flex items-center gap-1.5", className)} role="group" aria-label="App theme">
+    <div className={cn("flex items-center gap-2", className)} role="group" aria-label="App theme">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">Theme</span>
       {themes.map((id: ThemeId) => {
         const t = THEMES[id];
         const active = theme === id;
