@@ -74,7 +74,10 @@ export async function checkDailyQuota({ userId, token, endpoint }) {
       return { allowed: true, remaining: limit, limit, enforced: false };
     }
     const rows = (await r.json()) || [];
-    const used = rows.reduce((acc, row) => acc + (Number(row.provider_calls) || 0), 0);
+    // Count user messages (1 ledger row per message), NOT provider calls.
+    // The limit promises the user N AI replies per day, so the ledger must
+    // match that promise even when one reply burns 2 provider calls (model race).
+    const used = rows.length;
     return { allowed: used < limit, remaining: Math.max(0, limit - used), limit, enforced: true };
   } catch (err) {
     console.warn("[quota] usage lookup error, failing open:", err?.message || err);
@@ -82,7 +85,7 @@ export async function checkDailyQuota({ userId, token, endpoint }) {
   }
 }
 
-/** Append one ledger row for an AI call (providerCalls = provider requests spent). */
+/** Append one ledger row per user message (providerCalls kept for observability). */
 export async function recordUsage({ userId, token, endpoint, providerCalls = 1 }) {
   const { url } = supabaseEnv();
   if (!url) return;
