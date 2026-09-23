@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight, CheckCircle2, Flame, LineChart as LineChartIcon, MessageCircle,
-  ScanLine, Target, Dumbbell, Scale,
+  ScanLine, Target, Dumbbell, Scale, Sun, Sunrise, Moon,
 } from "lucide-react";
 import { Card, Badge, ProgressBar, buttonClasses } from "../components/ui";
 import ThemeDots from "../components/ThemeDots";
@@ -96,14 +96,17 @@ export default function Dashboard() {
   const weightProgress = goalProgressPercent(profile.start_weight_kg, profile.current_weight_kg, profile.target_weight_kg);
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const GreetingIcon = hour < 12 ? Sunrise : hour < 18 ? Sun : Moon;
 
   return (
     <div className="page-fade space-y-5">
       {/* Greeting + theme switcher */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-[13px] text-ink-faint">{greeting},</p>
-          <h1 className="display text-2xl font-bold text-ink">{profile.display_name}</h1>
+          <p className="flex items-center gap-1.5 text-[13px] font-semibold text-accent">
+            <GreetingIcon className="h-3.5 w-3.5" /> {greeting},
+          </p>
+          <h1 className="display bg-gradient-to-r from-accent via-accent-300 to-accent bg-clip-text text-2xl font-bold text-transparent">{profile.display_name}</h1>
         </div>
         <ThemeDots />
       </div>
