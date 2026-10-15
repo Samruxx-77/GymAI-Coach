@@ -20,8 +20,8 @@ import { TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
 const NAV = [
-  { to: "/app", label: "Dashboard", icon: Activity, end: true },
-  { to: "/app/nutrition", label: "Food Entry", icon: ChefHat },
+  { to: "/app", label: "Home", icon: Activity, end: true },
+  { to: "/app/nutrition", label: "Food", icon: ChefHat },
   { to: "/app/workouts", label: "Workouts", icon: Dumbbell },
   { to: "/app/progress", label: "Progress", icon: CalendarCheck },
   { to: "/app/coach", label: "AI Coach", icon: MessageCircle },
@@ -194,7 +194,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Mobile bottom nav — five in-bar tabs */}
       <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-line bg-surface-0 pt-1 pb-[max(env(safe-area-inset-bottom),4px)] lg:hidden">
         <BottomItem to="/app" label="Home" icon={Activity} end />
-        <BottomItem to="/app/nutrition" label="Food Entry" icon={ChefHat} />
+        <BottomItem to="/app/nutrition" label="Food" icon={ChefHat} />
         <BottomItem to="/app/workouts" label="Workouts" icon={Dumbbell} />
         <BottomItem to="/app/coach" label="Coach" icon={MessageCircle} />
         <BottomItem to="/app/profile" label="Profile" icon={UserIcon} />
