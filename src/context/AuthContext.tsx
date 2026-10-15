@@ -40,8 +40,8 @@ function friendlyAuthError(err: unknown): string {
     return "Password must be at least 6 characters.";
   if (m.includes("rate limit")) return "Too many attempts. Wait a minute and try again.";
   if (m.includes("failed to fetch") || m.includes("network"))
-    return "Network error — check your connection and Supabase URL.";
-  if (!supabaseConfigured) return "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.";
+    return "Can't connect right now. Check your internet connection and try again.";
+  if (!supabaseConfigured) return "The app can't reach its server right now. Please try again later.";
   return msg;
 }
 
