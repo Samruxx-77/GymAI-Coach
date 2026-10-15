@@ -17,6 +17,7 @@ create index if not exists workouts_user_updated
 
 -- 2. ai_messages: conversation must belong to the same user
 drop policy if exists "owner all" on public.ai_messages;
+drop policy if exists "ai_messages owner via conversation" on public.ai_messages;
 create policy "ai_messages owner via conversation" on public.ai_messages
   for all
   using (
