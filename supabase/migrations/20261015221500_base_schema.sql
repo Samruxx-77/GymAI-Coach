@@ -446,9 +446,9 @@ begin
   return new;
 end $$;
 
-drop trigger if exists user_achievements_verify on public.user_achievements;
-create trigger user_achievements_verify before insert on public.user_achievements
-  for each row execute function public.verify_achievement_unlock();
+-- (user_achievements_verify trigger is created after the user_achievements
+-- table in section 9 — DROP TRIGGER errors on a fresh DB if the table does
+-- not exist yet.)
 
 -- ── 8b. AI USAGE (append-only ledger — persistent per-user daily AI quota)
 -- The server records one row per AI endpoint call (with the number of
@@ -482,6 +482,10 @@ create table if not exists public.user_achievements (
   unlocked_at    timestamptz not null default now(),
   primary key (user_id, achievement_id)
 );
+
+drop trigger if exists user_achievements_verify on public.user_achievements;
+create trigger user_achievements_verify before insert on public.user_achievements
+  for each row execute function public.verify_achievement_unlock();
 
 -- ── 10. AI COACH CONVERSATIONS ─────────────────────────────────────
 create table if not exists public.ai_conversations (
